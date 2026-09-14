@@ -10,10 +10,10 @@ import CustomerSupportChat from './components/CustomerSupportChat';
 import OrderChatModal from './components/OrderChatModal'; 
 import logo from './assets/logo.png'; 
 
-// ✅ BASE URL UPDATE (AWS)
+// ✅ BASE URL UPDATE (AWS)[cite: 1]
 const API_BASE_URL = "https://Foodiee-backend-env.eba-5d9p6wzb.eu-north-1.elasticbeanstalk.com";
 
-// --- CUSTOM ANIMATED BIKE ICON FOR LEAFLET MAP ---
+// --- CUSTOM ANIMATED BIKE ICON FOR LEAFLET MAP ---[cite: 1]
 const getAnimatedBikeIcon = (rotationAngle) => {
   return new L.DivIcon({
     className: 'custom-animated-bike',
@@ -29,7 +29,7 @@ const getAnimatedBikeIcon = (rotationAngle) => {
   });
 };
 
-// --- MAP UPDATER HELPER ---
+// --- MAP UPDATER HELPER ---[cite: 1]
 function MapUpdater({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -39,7 +39,7 @@ function MapUpdater({ center }) {
   return null;
 }
 
-// --- SHOP BANNER AUTO-SLIDER COMPONENT ---
+// --- SHOP BANNER AUTO-SLIDER COMPONENT ---[cite: 1]
 function ShopBannerSlider({ selectedShop }) {
   const allShopImages = [
     selectedShop.imageUrl || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5',
@@ -94,21 +94,20 @@ export default function CustomerApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return localStorage.getItem('userMobile') ? true : false;
   });
-  const [isRegisterView, setIsRegisterView] = useState(false);
   
-  // --- OTP LOGIN STATES ---
-  const [step, setStep] = useState(1);
-  const [generatedOtpHint, setGeneratedOtpHint] = useState('');
+  // --- AUTH MODES: 'login', 'register', 'forgot' ---[cite: 1]
+  const [authMode, setAuthMode] = useState('login');
   const [showNotificationModal, setShowNotificationModal] = useState(false);
 
-  // --- UNREAD CHAT COUNT & BLINKING DOT STATES ---
+  // --- UNREAD CHAT COUNT & BLINKING DOT STATES ---[cite: 1]
   const [unreadSupportCount, setUnreadSupportCount] = useState(0); 
   const [unreadOrderCount, setUnreadOrderCount] = useState(0); 
 
-  // Form States
+  // Form States[cite: 1]
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [otpInput, setOtpInput] = useState('');
+  const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
 
   const [activeTab, setActiveTab] = useState('home');
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -116,15 +115,15 @@ export default function CustomerApp() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [cart, setCart] = useState([]);
 
-  // --- QUICK ACTION & FOOD TYPE FILTER STATES ---
+  // --- QUICK ACTION & FOOD TYPE FILTER STATES ---[cite: 1]
   const [quickFilter, setQuickFilter] = useState('All');
   const [foodTypeFilter, setFoodTypeFilter] = useState('All');
 
-  // --- EDIT PROFILE MODAL STATES ---
+  // --- EDIT PROFILE MODAL STATES ---[cite: 1]
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [editProfileName, setEditProfileName] = useState('');
 
-  // --- WALLET HISTORY & SCRATCH CARD MODAL STATES ---
+  // --- WALLET HISTORY & SCRATCH CARD MODAL STATES ---[cite: 1]
   const [isWalletHistoryOpen, setIsWalletHistoryOpen] = useState(false);
   const [scratchCards, setScratchCards] = useState(() => {
     const saved = localStorage.getItem('foodiee_saved_scratch_cards');
@@ -135,22 +134,22 @@ export default function CustomerApp() {
   const [scratchProgress, setScratchProgress] = useState(0);
   const canvasRef = useRef(null);
 
-  // --- ORDER CHAT STATES ---
+  // --- ORDER CHAT STATES ---[cite: 1]
   const [activeChatRecipient, setActiveChatRecipient] = useState(null); 
 
-  // --- BACKEND DYNAMIC FOOD, SHOPS & ORDERS STATE WITH AUTO POLLING ---
+  // --- BACKEND DYNAMIC FOOD, SHOPS & ORDERS STATE WITH AUTO POLLING ---[cite: 1]
   const [backendFoodItems, setBackendFoodItems] = useState([]);
   const [allShops, setAllShops] = useState([]);
   const [backendOrders, setBackendOrders] = useState([]);
   const [userPhoto, setUserPhoto] = useState('https://api.dicebear.com/7.x/avataaars/svg?seed=Naveen');
 
-  // --- DYNAMIC PROMO CODES & POP-UP STATES ---
+  // --- DYNAMIC PROMO CODES & POP-UP STATES ---[cite: 1]
   const [availablePromos, setAvailablePromos] = useState([
     { code: 'FIRST50', discount: '₹50 OFF', minOrder: 199, isActive: true }
   ]);
   const [promoPopup, setPromoPopup] = useState(null);
 
-  // --- NOTIFICATIONS STATE ---
+  // --- NOTIFICATIONS STATE ---[cite: 1]
   const [notifications, setNotifications] = useState([
     { id: 1, title: '⚡ Flash Offer Added!', desc: 'Use code FIRST50 for ₹50 OFF on your first food order.', time: 'Just now', unread: true },
     { id: 2, title: '🛒 Free Delivery', desc: 'Free delivery on all grocery orders above ₹199 in Ichapuram.', time: '2 hrs ago', unread: true }
@@ -198,7 +197,7 @@ export default function CustomerApp() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- WEBSOCKET LIVE BROADCAST & SUPPORT CHAT SYNC ---
+  // --- WEBSOCKET LIVE BROADCAST & SUPPORT CHAT SYNC ---[cite: 1]
   useEffect(() => {
     const userMob = phone || localStorage.getItem('userMobile');
     if (!userMob) return;
@@ -712,68 +711,6 @@ export default function CustomerApp() {
   const totalAmount = Math.max(0, ((subtotal + deliveryFee) + riderTip) - discount);
   const splitAmount = (totalAmount / Math.max(1, splitPeople)).toFixed(2);
 
-  const handleSendOtp = async (e) => {
-    e.preventDefault();
-    if (!phone || phone.length !== 10 || !/^[6-9]\d{9}$/.test(phone)) {
-      toast.error('❌ దయచేసి సరైన 10 అంకెల మొబైల్ నంబర్ ఇవ్వండి');
-      return;
-    }
-
-    const fullMobile = `+91${phone}`;
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile: fullMobile, role: 'customer' }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setGeneratedOtpHint(data.otp || '1234');
-        setStep(2);
-        toast.success('📲 OTP విజయవంతంగా పంపబడింది!');
-      } else {
-        toast.error('❌ OTP పంపడం విఫలమైంది');
-      }
-    } catch (error) {
-      toast.success('📲 OTP (Hint: 1234) జనరేట్ చేయబడింది!');
-      setStep(2);
-    }
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile: phone, otp: otpInput, role: "customer" }),
-      });
-
-      if (response.ok) {
-        const user = await response.json();
-        
-        localStorage.setItem('userMobile', user.mobile || phone);
-        localStorage.setItem('userName', user.name || 'Customer');
-
-        setAddress(prev => ({ ...prev, name: user.name || 'Customer', mobile: user.mobile || phone }));
-        if (user.profilePhoto) {
-          setUserPhoto(user.profilePhoto);
-        }
-        setIsLoggedIn(true);
-        toast.success(`🎉 Welcome back, ${user.name || 'Customer'}! Login Successful.`);
-      } else {
-        toast.error('❌ Invalid OTP! Please check.');
-      }
-    } catch (error) {
-      localStorage.setItem('userMobile', phone);
-      localStorage.setItem('userName', name || 'Customer');
-      setIsLoggedIn(true);
-      toast.success('🎉 Login Successful!');
-    }
-  };
-
   const applyPromo = () => {
     if (!promoCode.trim()) return;
 
@@ -1261,13 +1198,13 @@ export default function CustomerApp() {
           </div>
         )}
 
-        {/* LOGIN / OTP VIEW */}
+        {/* --- AUTHENTICATION SCREEN (LOGIN TOP, REGISTER & FORGOT DOWNSIDE) --- */}
         {!isLoggedIn ? (
           <div className="flex flex-col flex-1 w-full h-full bg-gradient-to-br from-slate-950 via-slate-900 to-[#fc8019]/30 items-center justify-center p-6 relative overflow-hidden">
             <div className="absolute top-10 right-[-20px] w-56 h-56 bg-orange-500/20 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
             <div className="absolute bottom-10 left-[-20px] w-56 h-56 bg-amber-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
-            <div className="w-full max-w-[370px] bg-slate-900/70 backdrop-blur-2xl rounded-[40px] p-8 shadow-2xl border border-white/10 space-y-6 relative z-10">
+            <div className="w-full max-w-[370px] bg-slate-900/85 backdrop-blur-2xl rounded-[40px] p-8 shadow-2xl border border-white/10 space-y-6 relative z-10">
               <div className="text-center space-y-3">
                 <div className="w-20 h-20 mx-auto rounded-3xl p-1 bg-gradient-to-tr from-[#fc8019] to-amber-400 shadow-xl shadow-orange-500/30 flex items-center justify-center transform hover:scale-105 transition-transform duration-300">
                   <div className="w-full h-full bg-slate-950 rounded-[22px] overflow-hidden flex items-center justify-center">
@@ -1277,7 +1214,7 @@ export default function CustomerApp() {
                 
                 <div className="space-y-1">
                   <h2 className="text-3xl font-black tracking-tight bg-gradient-to-r from-white via-slate-200 to-amber-400 bg-clip-text text-transparent">
-                    Foodiee..
+                    {authMode === 'login' ? 'Login' : authMode === 'register' ? 'Register' : 'Reset Password'}
                   </h2>
                   <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
                     Ichapuram's Fast Delivery Ecosystem
@@ -1285,22 +1222,55 @@ export default function CustomerApp() {
                 </div>
               </div>
 
-              {step === 1 ? (
-                <form onSubmit={handleSendOtp} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">
-                      Mobile Number
-                    </label>
-                    <div className="flex items-center gap-3 bg-slate-950/60 border border-slate-700/80 px-4 py-4 rounded-2xl focus-within:border-[#fc8019] focus-within:ring-2 focus-within:ring-orange-500/20 transition-all duration-300 shadow-inner">
-                      <div className="w-7 h-7 rounded-xl bg-orange-500/20 text-[#fc8019] flex items-center justify-center shrink-0">
-                        <Phone size={14} />
-                      </div>
+              {/* 1. PASSWORD LOGIN VIEW */}
+              {authMode === 'login' && (
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ mobile: phone, password })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      localStorage.setItem('userMobile', data.mobile || phone);
+                      localStorage.setItem('userName', data.name || 'Customer');
+                      setAddress(prev => ({ ...prev, name: data.name || 'Customer', mobile: data.mobile || phone }));
+                      setIsLoggedIn(true);
+                      toast.success(`🎉 Welcome back, ${data.name || 'Customer'}!`);
+                    } else {
+                      toast.error(data.error || 'Invalid mobile or password');
+                    }
+                  } catch (err) {
+                    toast.error('❌ Network error during login');
+                  }
+                }} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Mobile Number</label>
+                    <div className="flex items-center gap-3 bg-slate-950/60 border border-slate-700 px-4 py-3.5 rounded-2xl">
+                      <Phone size={14} className="text-[#fc8019]" />
                       <input 
                         type="tel" 
                         maxLength="10" 
                         value={phone} 
                         onChange={(e) => setPhone(e.target.value)} 
-                        placeholder="Enter 10-digit mobile number" 
+                        placeholder="10-digit mobile number" 
+                        className="bg-transparent border-none outline-none text-xs w-full font-bold text-white placeholder:text-slate-500" 
+                        required 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Password</label>
+                    <div className="flex items-center gap-3 bg-slate-950/60 border border-slate-700 px-4 py-3.5 rounded-2xl">
+                      <Lock size={14} className="text-[#fc8019]" />
+                      <input 
+                        type="password" 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        placeholder="Enter password" 
                         className="bg-transparent border-none outline-none text-xs w-full font-bold text-white placeholder:text-slate-500" 
                         required 
                       />
@@ -1309,60 +1279,159 @@ export default function CustomerApp() {
 
                   <button 
                     type="submit" 
-                    className="w-full bg-gradient-to-r from-[#fc8019] via-amber-500 to-yellow-400 text-slate-950 py-4 rounded-2xl font-black text-xs shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+                    className="w-full bg-gradient-to-r from-[#fc8019] via-amber-500 to-yellow-400 text-slate-950 py-4 rounded-2xl font-black text-xs shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span>Send Verification OTP</span>
+                    <span>Login to Foodiee</span>
                     <ArrowRight size={16} />
                   </button>
+
+                  {/* DOWNSIDE OPTIONS: Forgot Password & Register New User */}
+                  <div className="flex justify-between items-center pt-2 text-[11px] font-bold">
+                    <span onClick={() => setAuthMode('forgot')} className="text-blue-400 underline cursor-pointer hover:text-blue-300">
+                      Forgot Password?
+                    </span>
+                    <span onClick={() => setAuthMode('register')} className="text-emerald-400 underline cursor-pointer hover:text-emerald-300">
+                      Register New User
+                    </span>
+                  </div>
                 </form>
-              ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-4 animate-fadeIn">
-                  <div className="text-center space-y-1.5 bg-slate-950/40 p-3 rounded-2xl border border-slate-800">
-                    <p className="text-[11px] text-slate-300 font-bold">OTP sent securely to</p>
-                    <p className="text-sm font-black text-[#fc8019] flex items-center justify-center gap-2">
-                      <span>+91 {phone}</span>
-                      <span onClick={() => setStep(1)} className="text-[10px] text-blue-400 underline cursor-pointer hover:text-blue-300">Change</span>
-                    </p>
-                    {generatedOtpHint && (
-                      <div className="inline-block bg-amber-500/20 border border-amber-500/50 px-3 py-1 rounded-xl mt-1">
-                        <p className="text-[10px] text-amber-300 font-bold">Hint OTP: <span className="text-white font-black">{generatedOtpHint}</span></p>
-                      </div>
-                    )}
+              )}
+
+              {/* 2. REGISTRATION VIEW */}
+              {authMode === 'register' && (
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ mobile: phone, name, password, role: 'Customer' })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      toast.success('✓ Registration successful! Please login.');
+                      setAuthMode('login');
+                    } else {
+                      toast.error(data.error || 'Registration failed');
+                    }
+                  } catch (err) {
+                    toast.error('❌ Network error during registration');
+                  }
+                }} className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Full Name</label>
+                    <input 
+                      type="text" 
+                      value={name} 
+                      onChange={(e) => setName(e.target.value)} 
+                      placeholder="Enter your name" 
+                      className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-xs font-bold text-white outline-none" 
+                      required 
+                    />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest text-center">
-                      Enter 4-Digit OTP
-                    </label>
-                    <div className="flex items-center justify-center bg-slate-950/60 border border-slate-700/80 px-4 py-3.5 rounded-2xl shadow-inner">
-                      <input 
-                        type="text" 
-                        maxLength="4" 
-                        value={otpInput} 
-                        onChange={(e) => setOtpInput(e.target.value)} 
-                        placeholder="----" 
-                        className="bg-transparent border-none outline-none text-xl w-full font-black text-white tracking-[0.5em] text-center placeholder:tracking-normal" 
-                        required 
-                        autoFocus
-                      />
-                    </div>
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Mobile Number</label>
+                    <input 
+                      type="tel" 
+                      maxLength="10" 
+                      value={phone} 
+                      onChange={(e) => setPhone(e.target.value)} 
+                      placeholder="10-digit mobile number" 
+                      className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-xs font-bold text-white outline-none" 
+                      required 
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Create Password</label>
+                    <input 
+                      type="password" 
+                      value={password} 
+                      onChange={(e) => setPassword(e.target.value)} 
+                      placeholder="Create secure password" 
+                      className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-xs font-bold text-white outline-none" 
+                      required 
+                    />
                   </div>
 
                   <button 
                     type="submit" 
-                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white py-4 rounded-2xl font-black text-xs shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-3.5 rounded-2xl font-black text-xs shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
                   >
-                    <span>Verify & Login Now</span>
+                    <span>Register Account</span>
                     <CheckCircle2 size={16} />
                   </button>
+
+                  <div className="text-center pt-2">
+                    <span onClick={() => setAuthMode('login')} className="text-[11px] text-slate-400 underline cursor-pointer font-bold hover:text-white">
+                      Already have an account? Login
+                    </span>
+                  </div>
                 </form>
               )}
 
-              <div className="text-center pt-2">
-                <p className="text-[10px] text-slate-500 font-medium">
-                  By continuing, you agree to Foodiee's Terms & Privacy Policy
-                </p>
-              </div>
+              {/* 3. FORGOT / RESET PASSWORD VIEW */}
+              {authMode === 'forgot' && (
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ mobile: phone, newPassword })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      toast.success('✓ Password updated successfully in database!');
+                      setAuthMode('login');
+                    } else {
+                      toast.error(data.error || 'Failed to reset password');
+                    }
+                  } catch (err) {
+                    toast.error('❌ Network error during password reset');
+                  }
+                }} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Registered Mobile Number</label>
+                    <input 
+                      type="tel" 
+                      maxLength="10" 
+                      value={phone} 
+                      onChange={(e) => setPhone(e.target.value)} 
+                      placeholder="10-digit mobile number" 
+                      className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3.5 rounded-2xl text-xs font-bold text-white outline-none" 
+                      required 
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">New Password</label>
+                    <input 
+                      type="password" 
+                      value={newPassword} 
+                      onChange={(e) => setNewPassword(e.target.value)} 
+                      placeholder="Enter new password" 
+                      className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3.5 rounded-2xl text-xs font-bold text-white outline-none" 
+                      required 
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 py-4 rounded-2xl font-black text-xs shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Update Password</span>
+                    <ShieldCheck size={16} />
+                  </button>
+
+                  <div className="text-center pt-1">
+                    <span onClick={() => setAuthMode('login')} className="text-[11px] text-slate-400 underline cursor-pointer font-bold hover:text-white">
+                      Back to Login
+                    </span>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         ) : (
@@ -1507,8 +1576,6 @@ export default function CustomerApp() {
                       localStorage.removeItem('userMobile'); 
                       localStorage.removeItem('userName'); 
                       setIsLoggedIn(false); 
-                      setStep(1); 
-                      setOtpInput(''); 
                     }} 
                     className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-4 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
                   >
@@ -2541,7 +2608,7 @@ export default function CustomerApp() {
 
                   <div className="pt-1">
                     <button 
-                      onClick={() => { setIsLoggedIn(false); setStep(1); setOtpInput(''); }} 
+                      onClick={() => { setIsLoggedIn(false); localStorage.removeItem('userMobile'); }} 
                       className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-4 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
                     >
                       <LogOut size={16} /> Logout from Foodiee
