@@ -5,7 +5,7 @@ import axios from "axios";
 import { Send, Image as ImageIcon, Paperclip, X, ShieldCheck } from "lucide-react";
 
 // ✅ BASE URL UPDATE (AWS)
-const API_BASE_URL = "http://Foodiee-backend-env.eba-5d9p6wzb.eu-north-1.elasticbeanstalk.com";
+const API_BASE_URL = "https://Foodiee-backend-env.eba-5d9p6wzb.eu-north-1.elasticbeanstalk.com";
 
 export default function CustomerSupportChat({ customerMobile, customerName, onClose }) {
   const [messages, setMessages] = useState([]);
