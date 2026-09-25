@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import SockJS from "sockjs-client";
-import { Stomp } from "@stomp/stompjs";
+import { Client } from "@stomp/stompjs";
 import axios from "axios";
 import { Send, Image as ImageIcon, Paperclip, X, ShieldCheck } from "lucide-react";
 
-// ✅ BASE URL UPDATE (AWS)
+// ✅ Localhost Base URL
 const API_BASE_URL = "https://Foodiee-backend-env.eba-5d9p6wzb.eu-north-1.elasticbeanstalk.com";
 
 export default function CustomerSupportChat({ customerMobile, customerName, onClose }) {
@@ -20,24 +20,36 @@ export default function CustomerSupportChat({ customerMobile, customerName, onCl
   useEffect(() => {
     // 1. Fetch Chat History
     axios.get(`${API_BASE_URL}/api/chat/history/${mobileNumber}`)
-      .then((res) => setMessages(res.data))
+      .then((res) => setMessages(res.data || []))
       .catch((err) => console.error("Error fetching chat history", err));
 
-    // 2. Connect WebSocket
+    // 2. Connect WebSocket using local endpoint
     const socket = new SockJS(`${API_BASE_URL}/ws-foodiee`);
-    const stompClient = Stomp.over(socket);
-    stompClient.debug = () => {};
-    stompClientRef.current = stompClient;
-
-    stompClient.connect({}, () => {
-      stompClient.subscribe(`/topic/chat/${mobileNumber}`, (messageOutput) => {
-        const receivedMessage = JSON.parse(messageOutput.body);
-        setMessages((prev) => [...prev, receivedMessage]);
-      });
+    const stompClient = new Client({
+      webSocketFactory: () => socket,
+      debug: () => {},
+      onConnect: () => {
+        stompClient.subscribe(`/topic/chat/${mobileNumber}`, (messageOutput) => {
+          const receivedMessage = JSON.parse(messageOutput.body);
+          setMessages((prev) => {
+            // ✅ Strict duplicate check to prevent double rendering
+            const exists = prev.some(m => 
+              m.message === receivedMessage.message && 
+              m.timestamp === receivedMessage.timestamp &&
+              m.senderType === receivedMessage.senderType
+            );
+            if (exists) return prev;
+            return [...prev, receivedMessage];
+          });
+        });
+      }
     });
 
+    stompClient.activate();
+    stompClientRef.current = stompClient;
+
     return () => {
-      if (stompClientRef.current) stompClientRef.current.disconnect();
+      if (stompClientRef.current) stompClientRef.current.deactivate();
     };
   }, [mobileNumber]);
 
@@ -56,7 +68,7 @@ export default function CustomerSupportChat({ customerMobile, customerName, onCl
     }
   };
 
-  const sendMessage = (e) => {
+  const sendMessage = async (e) => {
     e.preventDefault();
     if (!messageInput.trim() && !selectedFile) return;
 
@@ -69,27 +81,85 @@ export default function CustomerSupportChat({ customerMobile, customerName, onCl
       senderMobile: mobileNumber,
       senderName: localStorage.getItem('userName') || currentUserName,
       message: messageContent,
-      senderType: "customer"
+      senderType: "customer",
+      timestamp: new Date().toISOString()
     };
 
-    if (stompClientRef.current && stompClientRef.current.connected) {
-      stompClientRef.current.send(`/app/send/${mobileNumber}`, {}, JSON.stringify(chatMessage));
+    try {
+      // Send via REST (Backend saves to DB and broadcasts via WebSocket)
+      await axios.post(`${API_BASE_URL}/api/chat/send`, chatMessage);
+
+      // Publish via STOMP if connected
+      if (stompClientRef.current && stompClientRef.current.connected) {
+        stompClientRef.current.publish({
+          destination: `/app/send/${mobileNumber}`,
+          body: JSON.stringify(chatMessage)
+        });
+      }
+
       setMessageInput("");
       setSelectedFile(null);
+    } catch (err) {
+      console.error("Failed to send message", err);
     }
   };
 
+  // ✅ WhatsApp Style Date Grouping Logic (Today & Last Dates)
+  const renderGroupedChatMessages = (messagesList) => {
+    const todayStr = new Date().toLocaleDateString();
+    
+    const grouped = messagesList.reduce((acc, msg) => {
+      const msgDate = msg.timestamp ? new Date(msg.timestamp).toLocaleDateString() : todayStr;
+      const dateKey = msgDate === todayStr ? 'Today' : msgDate;
+      if (!acc[dateKey]) acc[dateKey] = [];
+      acc[dateKey].push(msg);
+      return acc;
+    }, {});
+
+    return Object.entries(grouped).map(([dateLabel, msgs], idx) => (
+      <div key={idx} className="space-y-3">
+        {/* Date Divider Badge */}
+        <div className="flex justify-center my-3">
+          <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full shadow-inner border border-slate-700 uppercase tracking-wider">
+            {dateLabel}
+          </span>
+        </div>
+
+        {msgs.map((msg, mIdx) => {
+          const isCustomer = msg.senderType === 'customer';
+          return (
+            <div key={mIdx} className={`flex flex-col ${isCustomer ? 'items-end' : 'items-start'} space-y-0.5`}>
+              <div className={`max-w-[80%] p-3 rounded-2xl text-xs shadow-md relative ${
+                isCustomer 
+                  ? 'bg-[#005c4b] text-white rounded-br-none font-bold' // WhatsApp Outgoing Dark Teal
+                  : 'bg-[#202c33] text-white rounded-bl-none border border-slate-700/50' // WhatsApp Incoming Dark Gray
+              }`}>
+                <span className={`block text-[9px] uppercase font-black mb-1 ${isCustomer ? 'text-emerald-300' : 'text-[#fc8019]'}`}>
+                  {isCustomer ? (localStorage.getItem('userName') || msg.senderName || 'Customer') : (msg.senderName || 'Super Admin')}
+                </span>
+                <div className="text-xs font-medium leading-relaxed" dangerouslySetInnerHTML={{ __html: msg.message }} />
+                <span className="block text-[8px] text-slate-400 text-right mt-1">
+                  {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    ));
+  };
+
   return (
-    <div className="flex flex-col h-[550px] w-full max-w-md bg-slate-950 border border-slate-800 rounded-[32px] overflow-hidden shadow-2xl text-white font-sans">
+    <div className="flex flex-col h-[550px] w-full max-w-md bg-[#0b141a] border border-slate-800 rounded-[32px] overflow-hidden shadow-2xl text-white font-sans">
       
-      {/* Header */}
-      <div className="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+      {/* Header (WhatsApp Style Dark Green) */}
+      <div className="p-4 bg-[#202c33] border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#fc8019] to-amber-400 text-slate-950 flex items-center justify-center font-black shadow">
-            <ShieldCheck size={18} />
+          <div className="w-10 h-10 rounded-full bg-[#00a884] text-white flex items-center justify-center font-black shadow">
+            <ShieldCheck size={20} />
           </div>
           <div>
-            <h3 className="text-xs font-black text-white">Foodiee Live Support</h3>
+            <h3 className="text-xs font-black text-white">Foodiee WhatsApp Support</h3>
             <p className="text-[10px] text-emerald-400 font-bold">● Online ({localStorage.getItem('userName') || currentUserName})</p>
           </div>
         </div>
@@ -100,46 +170,30 @@ export default function CustomerSupportChat({ customerMobile, customerName, onCl
         )}
       </div>
 
-      {/* Messages Window */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-950/70">
+      {/* Messages Window (WhatsApp Dotted Background Pattern) */}
+      <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[radial-gradient(#111b21_1px,transparent_1px)] [background-size:16px_16px]">
         {messages.length === 0 ? (
-          <div className="text-center py-16 text-slate-500 space-y-1">
+          <div className="text-center py-20 text-slate-500 space-y-1">
             <p className="text-xs font-bold">How can we help you today?</p>
             <p className="text-[10px]">Type your query below to chat with Foodiee Admin.</p>
           </div>
         ) : (
-          messages.map((msg, index) => {
-            const isCustomer = msg.senderType === 'customer';
-            return (
-              <div key={index} className={`flex flex-col ${isCustomer ? 'items-end' : 'items-start'}`}>
-                <div className={`max-w-[75%] p-3 rounded-2xl text-xs shadow-md ${
-                  isCustomer 
-                    ? 'bg-[#fc8019] text-slate-950 rounded-br-none font-bold' 
-                    : 'bg-slate-900 text-white rounded-bl-none border border-slate-800'
-                }`}>
-                  <span className={`block text-[9px] uppercase font-black mb-1 ${isCustomer ? 'text-slate-900' : 'text-[#fc8019]'}`}>
-                    {isCustomer ? (localStorage.getItem('userName') || msg.senderName || 'Customer') : (msg.senderName || 'Super Admin')}
-                  </span>
-                  <div className="text-xs font-medium leading-relaxed" dangerouslySetInnerHTML={{ __html: msg.message }} />
-                </div>
-              </div>
-            );
-          })
+          renderGroupedChatMessages(messages)
         )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Selected File Preview */}
       {selectedFile && (
-        <div className="px-4 py-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs">
+        <div className="px-4 py-2 bg-[#202c33] border-t border-slate-800 flex items-center justify-between text-xs">
           <span className="text-amber-400 truncate max-w-[250px]">📎 {selectedFile.name}</span>
           <button onClick={() => setSelectedFile(null)} className="text-rose-400 font-bold cursor-pointer">Remove</button>
         </div>
       )}
 
-      {/* Input Box */}
-      <form onSubmit={sendMessage} className="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
-        <label className="text-slate-400 hover:text-white cursor-pointer p-2 rounded-xl bg-slate-950 border border-slate-800">
+      {/* Input Box (WhatsApp Style) */}
+      <form onSubmit={sendMessage} className="p-3 bg-[#202c33] border-t border-slate-800 flex items-center gap-2">
+        <label className="text-slate-400 hover:text-white cursor-pointer p-2.5 rounded-xl bg-[#2a3942] border border-slate-700/50">
           <Paperclip size={16} />
           <input type="file" onChange={handleFileUpload} className="hidden" accept="image/*,.pdf,.doc,.docx" />
         </label>
@@ -148,13 +202,13 @@ export default function CustomerSupportChat({ customerMobile, customerName, onCl
           type="text"
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
-          placeholder="Type your message..."
-          className="flex-1 bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white outline-none focus:border-[#fc8019] transition"
+          placeholder="Type a message..."
+          className="flex-1 bg-[#2a3942] border border-slate-700/50 px-4 py-3 rounded-xl text-xs font-bold text-white outline-none focus:border-[#00a884] transition"
         />
 
         <button 
           type="submit" 
-          className="bg-[#fc8019] hover:bg-amber-400 text-slate-950 px-4 py-2.5 rounded-xl font-black text-xs shadow cursor-pointer flex items-center gap-1 transition"
+          className="bg-[#00a884] hover:bg-[#008f72] text-white px-4 py-3 rounded-xl font-black text-xs shadow cursor-pointer flex items-center gap-1 transition"
         >
           <Send size={14} /> Send
         </button>

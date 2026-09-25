@@ -10,10 +10,10 @@ import CustomerSupportChat from './components/CustomerSupportChat';
 import OrderChatModal from './components/OrderChatModal'; 
 import logo from './assets/logo.png'; 
 
-// ✅ BASE URL UPDATE (AWS)[cite: 1]
+// ✅ BASE URL UPDATE (AWS)
 const API_BASE_URL = "https://Foodiee-backend-env.eba-5d9p6wzb.eu-north-1.elasticbeanstalk.com";
 
-// --- CUSTOM ANIMATED BIKE ICON FOR LEAFLET MAP ---[cite: 1]
+// --- CUSTOM ANIMATED BIKE ICON FOR LEAFLET MAP ---
 const getAnimatedBikeIcon = (rotationAngle) => {
   return new L.DivIcon({
     className: 'custom-animated-bike',
@@ -29,7 +29,7 @@ const getAnimatedBikeIcon = (rotationAngle) => {
   });
 };
 
-// --- MAP UPDATER HELPER ---[cite: 1]
+// --- MAP UPDATER HELPER ---
 function MapUpdater({ center }) {
   const map = useMap();
   useEffect(() => {
@@ -39,7 +39,7 @@ function MapUpdater({ center }) {
   return null;
 }
 
-// --- SHOP BANNER AUTO-SLIDER COMPONENT ---[cite: 1]
+// --- SHOP BANNER AUTO-SLIDER COMPONENT ---
 function ShopBannerSlider({ selectedShop }) {
   const allShopImages = [
     selectedShop.imageUrl || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5',
@@ -72,7 +72,7 @@ function ShopBannerSlider({ selectedShop }) {
       <div className="absolute bottom-3 left-4 right-4 z-30 flex justify-between items-end">
         <div>
           <h3 className="text-base font-black text-white drop-shadow-md">{selectedShop.name}</h3>
-          <p className="text-[11px] text-slate-300 font-medium">{selectedShop.address} • {selectedShop.rating}</p>
+          <p className="text-[11px] text-slate-300 font-medium">{selectedShop.address}</p>
         </div>
 
         {allShopImages.length > 1 && (
@@ -95,15 +95,12 @@ export default function CustomerApp() {
     return localStorage.getItem('userMobile') ? true : false;
   });
   
-  // --- AUTH MODES: 'login', 'register', 'forgot' ---[cite: 1]
   const [authMode, setAuthMode] = useState('login');
   const [showNotificationModal, setShowNotificationModal] = useState(false);
 
-  // --- UNREAD CHAT COUNT & BLINKING DOT STATES ---[cite: 1]
   const [unreadSupportCount, setUnreadSupportCount] = useState(0); 
   const [unreadOrderCount, setUnreadOrderCount] = useState(0); 
 
-  // Form States[cite: 1]
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -115,15 +112,12 @@ export default function CustomerApp() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [cart, setCart] = useState([]);
 
-  // --- QUICK ACTION & FOOD TYPE FILTER STATES ---[cite: 1]
   const [quickFilter, setQuickFilter] = useState('All');
   const [foodTypeFilter, setFoodTypeFilter] = useState('All');
 
-  // --- EDIT PROFILE MODAL STATES ---[cite: 1]
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [editProfileName, setEditProfileName] = useState('');
 
-  // --- WALLET HISTORY & SCRATCH CARD MODAL STATES ---[cite: 1]
   const [isWalletHistoryOpen, setIsWalletHistoryOpen] = useState(false);
   const [scratchCards, setScratchCards] = useState(() => {
     const saved = localStorage.getItem('foodiee_saved_scratch_cards');
@@ -134,22 +128,22 @@ export default function CustomerApp() {
   const [scratchProgress, setScratchProgress] = useState(0);
   const canvasRef = useRef(null);
 
-  // --- ORDER CHAT STATES ---[cite: 1]
   const [activeChatRecipient, setActiveChatRecipient] = useState(null); 
 
-  // --- BACKEND DYNAMIC FOOD, SHOPS & ORDERS STATE WITH AUTO POLLING ---[cite: 1]
   const [backendFoodItems, setBackendFoodItems] = useState([]);
   const [allShops, setAllShops] = useState([]);
   const [backendOrders, setBackendOrders] = useState([]);
   const [userPhoto, setUserPhoto] = useState('https://api.dicebear.com/7.x/avataaars/svg?seed=Naveen');
 
-  // --- DYNAMIC PROMO CODES & POP-UP STATES ---[cite: 1]
+  const [activeTrackingOrder, setActiveTrackingOrder] = useState(null);
+  const [riderLocation, setRiderLocation] = useState({ lat: 18.5793, lng: 84.4452 });
+  const [deliveryBoyCoords, setDeliveryBoyCoords] = useState({ lat: 18.5793, lng: 84.4452 });
+
   const [availablePromos, setAvailablePromos] = useState([
     { code: 'FIRST50', discount: '₹50 OFF', minOrder: 199, isActive: true }
   ]);
   const [promoPopup, setPromoPopup] = useState(null);
 
-  // --- NOTIFICATIONS STATE ---[cite: 1]
   const [notifications, setNotifications] = useState([
     { id: 1, title: '⚡ Flash Offer Added!', desc: 'Use code FIRST50 for ₹50 OFF on your first food order.', time: 'Just now', unread: true },
     { id: 2, title: '🛒 Free Delivery', desc: 'Free delivery on all grocery orders above ₹199 in Ichapuram.', time: '2 hrs ago', unread: true }
@@ -197,7 +191,6 @@ export default function CustomerApp() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- WEBSOCKET LIVE BROADCAST & SUPPORT CHAT SYNC ---[cite: 1]
   useEffect(() => {
     const userMob = phone || localStorage.getItem('userMobile');
     if (!userMob) return;
@@ -206,7 +199,6 @@ export default function CustomerApp() {
     const stompClient = new Client({
       webSocketFactory: () => socket,
       onConnect: () => {
-        // 1. Support Chat Subscriber
         stompClient.subscribe(`/topic/chat/${userMob}`, (message) => {
           const incoming = JSON.parse(message.body);
           if (incoming.senderType !== 'customer') {
@@ -215,31 +207,87 @@ export default function CustomerApp() {
           }
         });
 
-        // 2. 🚀 Broadcast Push Notifications Subscriber (All Users / Customers)
         stompClient.subscribe('/topic/broadcast/all', (message) => {
           const broadcastData = JSON.parse(message.body);
           toast((t) => (
-            <div className="space-y-1">
-              <p className="font-black text-amber-400 text-xs">📢 Foodiee ప్రత్యేక ప్రకటన</p>
-              <p className="text-xs text-white">{broadcastData.message}</p>
+            <div className="space-y-2 p-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📢</span>
+                <p className="font-black text-amber-400 text-xs uppercase">Foodiee Special Alert</p>
+              </div>
+              <p className="text-xs text-white font-medium">{broadcastData.message || broadcastData.desc}</p>
               {broadcastData.imageUrl && (
-                <img src={`${API_BASE_URL}/${broadcastData.imageUrl}`} alt="Offer" className="w-full h-24 object-cover rounded-xl mt-1 shadow" />
+                <div className="w-full h-32 rounded-2xl overflow-hidden border border-slate-700 shadow-lg mt-1">
+                  <img src={broadcastData.imageUrl.startsWith('http') ? broadcastData.imageUrl : `${API_BASE_URL}/${broadcastData.imageUrl}`} alt="Offer" className="w-full h-full object-cover" />
+                </div>
               )}
             </div>
-          ), { duration: 6000 });
+          ), { duration: 8000, position: 'top-center' });
+
+          setNotifications(prev => [
+            {
+              id: Date.now(),
+              title: broadcastData.title || '📢 Special Alert',
+              desc: broadcastData.message || broadcastData.desc,
+              time: 'Just now',
+              unread: true
+            },
+            ...prev
+          ]);
         });
 
-        stompClient.subscribe('/topic/broadcast/customers', (message) => {
+       stompClient.subscribe('/topic/broadcast/customers', (message) => {
           const broadcastData = JSON.parse(message.body);
+          
           toast((t) => (
-            <div className="space-y-1">
-              <p className="font-black text-amber-400 text-xs">📢 కస్టమర్ స్పెషల్ అలర్ట్</p>
-              <p className="text-xs text-white">{broadcastData.message}</p>
+            <div className="space-y-2.5 p-2 text-center">
+              <div className="flex items-center justify-center gap-1.5">
+                <span className="text-lg">🎉</span>
+                <p className="font-black text-amber-400 text-xs uppercase tracking-wider">Customer Special Alert</p>
+              </div>
+
+              {/* ✅ Message Text Display Fix */}
+              <p className="text-xs text-white font-bold leading-relaxed">
+                {broadcastData.message || broadcastData.desc || broadcastData.title || "Special offers available now!"}
+              </p>
+              
+              {/* ✅ Image URL & Display Fix */}
               {broadcastData.imageUrl && (
-                <img src={`${API_BASE_URL}/${broadcastData.imageUrl}`} alt="Offer" className="w-full h-24 object-cover rounded-xl mt-1 shadow" />
+                <div className="w-full h-36 rounded-2xl overflow-hidden border border-slate-700 shadow-xl bg-slate-950 mt-1">
+                  <img 
+                    src={broadcastData.imageUrl.startsWith('http') ? broadcastData.imageUrl : `${API_BASE_URL}/${broadcastData.imageUrl.startsWith('/') ? broadcastData.imageUrl.slice(1) : broadcastData.imageUrl}`} 
+                    alt="Offer Banner" 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none'; // ఇమేజ్ లోడ్ అవ్వకపోతే ఎర్రర్ రాకుండా హైడ్ చేస్తుంది
+                    }} 
+                  />
+                </div>
               )}
             </div>
-          ), { duration: 6000 });
+          ), { 
+            duration: 10000, 
+            position: 'top-center',
+            style: {
+              background: '#0f172a',
+              color: '#fff',
+              border: '2px solid rgba(245, 158, 11, 0.5)',
+              borderRadius: '24px',
+              padding: '12px'
+            }
+          });
+
+          // ✅ Notifications List లో సేవ్ అయ్యే లాజిక్ (ఒకటి కూడా మిస్ కాకుండా)
+          setNotifications(prev => [
+            {
+              id: Date.now(),
+              title: broadcastData.title || '🎉 Customer Alert',
+              desc: broadcastData.message || broadcastData.desc,
+              time: 'Just now',
+              unread: true
+            },
+            ...prev
+          ]);
         });
       }
     });
@@ -249,15 +297,46 @@ export default function CustomerApp() {
   }, [phone]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const userMob = phone || localStorage.getItem('userMobile');
+    if (!userMob) return;
+
+    const fetchOrdersLive = async () => {
       try {
-        const foodRes = await fetch(`${API_BASE_URL}/api/food/all`);
+        const orderRes = await fetch(`${API_BASE_URL}/api/orders/customer/${userMob}`);
+        if (orderRes.ok) {
+          const orderData = await orderRes.json();
+          setBackendOrders(orderData);
+          
+          if (activeTrackingOrder) {
+            const updatedActive = orderData.find(o => String(o.id) === String(activeTrackingOrder.id) || String(o.orderId) === String(activeTrackingOrder.orderId));
+            if (updatedActive) {
+              setActiveTrackingOrder(updatedActive);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Live order status poll error:", err);
+      }
+    };
+
+    fetchOrdersLive();
+    const interval = setInterval(fetchOrdersLive, 2000);
+    return () => clearInterval(interval);
+  }, [phone, activeTrackingOrder?.id]);
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [foodRes, shopRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/food/all`),
+          fetch(`${API_BASE_URL}/api/shop/all`)
+        ]);
+
         if (foodRes.ok) {
           const foodData = await foodRes.json();
           setBackendFoodItems(foodData);
         }
 
-        const shopRes = await fetch(`${API_BASE_URL}/api/shop/all`);
         if (shopRes.ok) {
           const shopData = await shopRes.json();
           setAllShops(shopData);
@@ -277,17 +356,43 @@ export default function CustomerApp() {
             if (profileData.profilePhoto) {
               setUserPhoto(profileData.profilePhoto);
             }
+            if (profileData.name || profileData.fullName) {
+              const fetchedName = profileData.name || profileData.fullName;
+              localStorage.setItem('userName', fetchedName);
+              setAddress(prev => ({ ...prev, name: fetchedName }));
+            }
           }
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching initial data:", error);
       }
     };
 
-    fetchData();
-    const interval = setInterval(fetchData, 4000);
-    return () => clearInterval(interval);
-  }, [phone]); 
+    fetchInitialData();
+  }, [phone]);
+
+  useEffect(() => {
+    if (!selectedShop || !selectedShop.id) return;
+    
+    const fetchShopSpecificMenu = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/food/shop/${selectedShop.id}`);
+        if (res.ok) {
+          const shopItems = await res.json();
+          if (shopItems && shopItems.length > 0) {
+            setBackendFoodItems(prev => {
+              const filtered = prev.filter(item => item.shopId !== selectedShop.id && item.restaurantId !== selectedShop.id && item.shop_id !== selectedShop.id);
+              return [...filtered, ...shopItems];
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching shop specific items:", err);
+      }
+    };
+
+    fetchShopSpecificMenu();
+  }, [selectedShop]);
 
   const [darkMode, setDarkMode] = useState(true);
   const [isSupportChatOpen, setIsSupportChatOpen] = useState(false);
@@ -298,10 +403,6 @@ export default function CustomerApp() {
 
   const [riderTip, setRiderTip] = useState(0);
   const [splitPeople, setSplitPeople] = useState(1);
-
-  const [activeTrackingOrder, setActiveTrackingOrder] = useState(null);
-  const [riderLocation, setRiderLocation] = useState({ lat: 18.5793, lng: 84.4452 });
-  const [deliveryBoyCoords, setDeliveryBoyCoords] = useState({ lat: 18.5793, lng: 84.4452 });
 
   useEffect(() => {
     if (!activeTrackingOrder) return;
@@ -326,7 +427,6 @@ export default function CustomerApp() {
           }
         });
 
-        // Order Specific Chat Listener
         stompClient.subscribe(`/topic/chat/${activeTrackingOrder.id || activeTrackingOrder.orderId}`, (message) => {
           const chatData = JSON.parse(message.body);
           if (chatData.senderType !== 'customer') {
@@ -334,12 +434,18 @@ export default function CustomerApp() {
             toast.success(`💬 న్యూ ఆర్డర్ మెసేజ్ వచ్చింది!`);
           }
         });
+
+        stompClient.subscribe(`/topic/order/status/${activeTrackingOrder.id || activeTrackingOrder.orderId}`, (message) => {
+          const newStatus = message.body;
+          setActiveTrackingOrder(prev => ({ ...prev, status: newStatus }));
+          toast.success(`📦 Order Status Updated: ${newStatus}`);
+        });
       },
     });
 
     stompClient.activate();
     return () => stompClient.deactivate();
-  }, [activeTrackingOrder]);
+  }, [activeTrackingOrder?.id]);
 
   const [walletBalance, setWalletBalance] = useState(() => {
     const saved = localStorage.getItem('foodiee_wallet_balance');
@@ -348,9 +454,7 @@ export default function CustomerApp() {
 
   const [paymentHistory, setPaymentHistory] = useState(() => {
     const saved = localStorage.getItem('foodiee_payment_history');
-    return saved !== null ? JSON.parse(saved) : [
-      { id: '#PAY-901', type: 'CREDIT', method: 'Wallet Top-up (Razorpay)', amount: 140, date: '18 Aug 2026', status: 'Success' }
-    ];
+    return saved !== null ? JSON.parse(saved) : [];
   });
 
   const handlePhotoUpload = async (e) => {
@@ -429,11 +533,12 @@ export default function CustomerApp() {
 
     const amt = activeScratchCard.amount;
     const timestamp = new Date().toLocaleString();
+    const txnId = "SCRATCH_" + Math.floor(100000 + Math.random() * 900000);
 
     setWalletBalance(prev => prev + amt);
     
     setPaymentHistory(prev => [{
-      id: "SCRATCH_" + Math.floor(100000 + Math.random() * 900000),
+      id: txnId,
       type: 'CREDIT',
       method: `🎁 Scratch Card Win (₹${amt} Added)`,
       amount: amt,
@@ -449,23 +554,21 @@ export default function CustomerApp() {
 
   const [savedAddresses, setSavedAddresses] = useState(() => {
     const saved = localStorage.getItem('foodiee_multiple_addresses');
-    return saved !== null ? JSON.parse(saved) : [
-      { id: 1, type: 'Home', name: 'Bommali Naveen', mobile: '9123456789', houseNo: 'Door 2-45', street: 'Main Road', landmark: 'Near Temple', district: 'Ichapuram', state: 'Andhra Pradesh', latitude: 18.5793, longitude: 84.4452 }
-    ];
+    return saved !== null ? JSON.parse(saved) : [];
   });
 
   const [address, setAddress] = useState(() => {
     const savedActive = localStorage.getItem('foodiee_active_address');
     if (savedActive !== null) return JSON.parse(savedActive);
     return savedAddresses[0] || {
-      name: 'Bommali Naveen',
-      mobile: '9123456789',
-      houseNo: 'Door 2-45',
-      street: 'Main Road',
-      landmark: 'Near Temple',
-      district: 'Ichapuram',
-      state: 'Andhra Pradesh',
-      pincode: '532484',
+      name: localStorage.getItem('userName') || '',
+      mobile: localStorage.getItem('userMobile') || '',
+      houseNo: '',
+      street: '',
+      landmark: '',
+      district: '',
+      state: '',
+      pincode: '',
       latitude: 18.5793,
       longitude: 84.4452
     };
@@ -473,14 +576,14 @@ export default function CustomerApp() {
 
   const [newAddressInput, setNewAddressInput] = useState({
     type: 'Home',
-    name: 'Bommali Naveen',
-    mobile: '9123456789',
+    name: localStorage.getItem('userName') || '',
+    mobile: localStorage.getItem('userMobile') || '',
     houseNo: '',
     street: '',
     landmark: '',
-    district: 'Ichapuram',
-    state: 'Andhra Pradesh',
-    pincode: '532484',
+    district: '',
+    state: '',
+    pincode: '',
     latitude: 18.5793,
     longitude: 84.4452
   });
@@ -544,9 +647,9 @@ export default function CustomerApp() {
           houseNo: '',
           street: '', 
           landmark: '',
-          district: 'Ichapuram', 
-          state: 'Andhra Pradesh', 
-          pincode: '532484', 
+          district: '', 
+          state: '', 
+          pincode: '', 
           latitude: 18.5793, 
           longitude: 84.4452 
         });
@@ -656,11 +759,12 @@ export default function CustomerApp() {
   };
 
   const verifyAndSavePayment = async (paymentId, amount) => {
+    const timestamp = new Date().toLocaleString();
     const paymentPayload = {
       transactionId: paymentId,
-      customerMobile: address.mobile,
+      customerMobile: address.mobile || phone || localStorage.getItem('userMobile'),
       totalAmount: amount,
-      paymentMethod: 'Razorpay Online',
+      paymentMethod: 'Razorpay Online Top-up',
       paymentStatus: 'SUCCESS',
       shopId: selectedShop ? selectedShop.id : 1
     };
@@ -675,12 +779,13 @@ export default function CustomerApp() {
       if (res.ok) {
         const savedTx = await res.json();
         setWalletBalance(prev => prev + amount);
+        
         setPaymentHistory(prev => [{
           id: savedTx.transactionId || paymentId,
           type: 'CREDIT',
-          method: 'Wallet Top-up (Razorpay)',
+          method: 'Wallet Top-up (Razorpay / UPI)',
           amount: amount,
-          date: 'Just now',
+          date: timestamp,
           status: 'Success'
         }, ...prev]);
 
@@ -712,31 +817,49 @@ export default function CustomerApp() {
   const splitAmount = (totalAmount / Math.max(1, splitPeople)).toFixed(2);
 
   const applyPromo = () => {
-    if (!promoCode.trim()) return;
+    if (!promoCode.trim()) {
+      setDiscount(0); // ✅ కూపన్ కోడ్ ఇవ్వకపోతే డిస్కౌంట్ జీరో ఉండాలి
+      return;
+    }
 
     const usedPromos = JSON.parse(localStorage.getItem('foodiee_used_promos') || '[]');
     if (usedPromos.includes(promoCode.toUpperCase())) {
       toast.error(`❌ Coupon ${promoCode.toUpperCase()} already used! Valid only once per customer.`);
+      setDiscount(0);
       return;
     }
 
+    // డేటాబేస్ లేదా availablePromos నుండి ఆ కూపన్‌కి సంబంధించిన ఒరిజినల్ డిస్కౌంట్ అమౌంట్ తీసుకోవడం
     const matched = availablePromos.find(p => p.code.toUpperCase() === promoCode.toUpperCase());
+    
     if (matched) {
-      setDiscount(50);
+      let numericDiscount = 0;
+      const rawDiscount = String(matched.discount || '');
+      
+      if (rawDiscount.includes('₹')) {
+        numericDiscount = parseFloat(rawDiscount.replace(/[^0-9.]/g, '')) || 0;
+      } else if (!isNaN(rawDiscount)) {
+        numericDiscount = parseFloat(rawDiscount) || 0;
+      }
+
+      setDiscount(numericDiscount);
       toast.success(`🎁 Promo code ${matched.code} applied successfully!`);
-    } else if (promoCode.toUpperCase() === 'FIRST50') {
-      setDiscount(50);
-      toast.success('🎁 Promo code applied! ₹50 OFF');
     } else {
+      // ✅ మ్యాచ్ అయ్యే కూపన్ లేకపోతే ఎలాంటి డిస్కౌంట్ వర్తించకూడదు (0)
+      setDiscount(0);
       toast.error('❌ Invalid Promo Code');
     }
   };
 
   const processOrderCompletion = async (methodName) => {
     const orderItemsDesc = cart.map(i => `${i.qty}x ${i.name}`).join(', ');
+    const timestamp = new Date().toLocaleString();
+    const txnId = "ORD_TXN_" + Math.floor(100000 + Math.random() * 900000);
+
+    const currentCustomerName = address.name || localStorage.getItem('userName') || name || 'Customer';
 
     const newOrderPayload = {
-      customerName: address.name,
+      customerName: currentCustomerName,
       customerMobile: address.mobile || phone || localStorage.getItem('userMobile'),
       deliveryAddress: `${address.houseNo ? address.houseNo + ', ' : ''}${address.street}, ${address.landmark ? 'Near ' + address.landmark + ', ' : ''}${address.district}, ${address.state} - ${address.pincode}`,
       shopName: selectedShop ? selectedShop.name : 'Local Store',
@@ -763,18 +886,19 @@ export default function CustomerApp() {
       if (response.ok) {
         const savedOrder = await response.json();
 
-        if (discount > 0 && promoCode) {
-          const usedPromos = JSON.parse(localStorage.getItem('foodiee_used_promos') || '[]');
+       if (discount > 0 && promoCode) {
+          const userMob = address.mobile || phone || localStorage.getItem('userMobile');
+          const usedPromos = JSON.parse(localStorage.getItem(`foodiee_used_promos_${userMob}`) || '[]');
           if (!usedPromos.includes(promoCode.toUpperCase())) {
             usedPromos.push(promoCode.toUpperCase());
-            localStorage.setItem('foodiee_used_promos', JSON.stringify(usedPromos));
+            localStorage.setItem(`foodiee_used_promos_${userMob}`, JSON.stringify(usedPromos));
           }
         }
 
         if (methodName.includes('Wallet')) {
           const debitPayload = {
-            transactionId: "WAL_DEBIT_" + Math.floor(100000 + Math.random() * 900000),
-            customerMobile: address.mobile,
+            transactionId: txnId,
+            customerMobile: address.mobile || phone || localStorage.getItem('userMobile'),
             totalAmount: totalAmount,
             paymentMethod: 'Wallet Deduction',
             paymentStatus: 'SUCCESS',
@@ -789,36 +913,21 @@ export default function CustomerApp() {
 
           setWalletBalance(prev => prev - totalAmount);
           setPaymentHistory(prev => [{
-            id: debitPayload.transactionId,
+            id: txnId,
             type: 'DEBIT',
-            method: `Paid for Order (${savedOrder.shopName || 'Store'})`,
+            method: `Order Payment (${savedOrder.shopName || selectedShop?.name || 'Store'})`,
             amount: totalAmount,
-            date: 'Just now',
+            date: timestamp,
             status: 'Success'
           }, ...prev]);
         } 
-        else if (methodName.includes('Razorpay')) {
-          const rzpPayload = {
-            transactionId: "ORD_RAZOR_" + Math.floor(100000 + Math.random() * 900000),
-            customerMobile: address.mobile,
-            totalAmount: totalAmount,
-            paymentMethod: 'Razorpay Online Checkout',
-            paymentStatus: 'SUCCESS',
-            shopId: selectedShop ? selectedShop.id : 1
-          };
-
-          await fetch(`${API_BASE_URL}/api/payments/process`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(rzpPayload),
-          });
-
+        else {
           setPaymentHistory(prev => [{
-            id: rzpPayload.transactionId,
+            id: txnId,
             type: 'DEBIT',
-            method: 'Razorpay Online Checkout',
+            method: `${methodName} (${savedOrder.shopName || selectedShop?.name || 'Store'})`,
             amount: totalAmount,
-            date: 'Just now',
+            date: timestamp,
             status: 'Success'
           }, ...prev]);
         }
@@ -829,8 +938,8 @@ export default function CustomerApp() {
           shop: savedOrder.shopName || (selectedShop ? selectedShop.name : 'Store'),
           items: savedOrder.items || newOrderPayload.items,
           qtotal: savedOrder.totalAmount || totalAmount,
-          date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) + ' - ' + new Date().toLocaleDateString(),
-          customerName: address.name,
+          date: timestamp,
+          customerName: currentCustomerName,
           mobile: address.mobile || phone,
           deliveryAddress: newOrderPayload.deliveryAddress,
           paymentMethod: methodName,
@@ -916,9 +1025,32 @@ export default function CustomerApp() {
     .filter(shop => {
       const shopCat = (shop.category || '').toUpperCase();
       const targetCat = (selectedCategory || '').toUpperCase();
+
+      if (searchQuery && searchQuery.trim() !== '') {
+        const query = searchQuery.toLowerCase();
+        const shopNameMatch = (shop.shopName || shop.name || '').toLowerCase().includes(query);
+        const shopCatMatch = shopCat.toLowerCase().includes(query);
+        
+        const shopItems = backendFoodItems.filter(item =>
+          String(item.restaurantId) === String(shop.id) || 
+          String(item.shopId) === String(shop.id) || 
+          String(item.shop_id) === String(shop.id)
+        );
+        const itemMatch = shopItems.some(i => (i.itemName || i.name || '').toLowerCase().includes(query));
+
+        return shopNameMatch || shopCatMatch || itemMatch;
+      }
+
       if (!targetCat) return true;
+
       if (targetCat === 'MEAT & FISH') {
         return shopCat.includes('MEAT') || shopCat.includes('CHICKEN') || shopCat.includes('MUTTON') || shopCat.includes('FISH') || shopCat.includes('MEAT & FISH');
+      }
+      if (targetCat === 'GROCERY') {
+        return shopCat.includes('GROCERY') || shopCat.includes('STORE') || (shop.name || '').toUpperCase().includes('GROCERY') || (shop.shopName || '').toUpperCase().includes('GROCERY');
+      }
+      if (targetCat === 'FOOD') {
+        return shopCat.includes('FOOD') || shopCat.includes('TIFFIN') || shopCat.includes('MEAL') || shopCat.includes('FAST');
       }
       return shopCat.includes(targetCat);
     })
@@ -930,12 +1062,14 @@ export default function CustomerApp() {
     })
     .map(shop => {
       const shopItems = backendFoodItems.filter(item =>
-        item.restaurantId === shop.id || item.restaurantId === Number(shop.id) || item.shopId === shop.id || item.shopId === Number(shop.id)
+        String(item.restaurantId) === String(shop.id) || 
+        String(item.shopId) === String(shop.id) || 
+        String(item.shop_id) === String(shop.id)
       );
 
       const categoriesMap = {};
       shopItems.forEach(item => {
-        const cat = item.category || 'General';
+        const cat = item.category || 'General Items';
         if (!categoriesMap[cat]) categoriesMap[cat] = [];
         categoriesMap[cat].push(item);
       });
@@ -956,9 +1090,8 @@ export default function CustomerApp() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-0 sm:p-4 font-sans">
-      <div className="w-full max-w-[420px] h-[100dvh] sm:h-[840px] bg-slate-900 sm:rounded-[3rem] sm:shadow-2xl sm:border-[8px] sm:border-slate-800 flex flex-col relative overflow-hidden text-gray-900 dark:text-white"> <Toaster />
+      <div className="w-full max-w-[420px] h-[100dvh] sm:h-[840px] bg-slate-900 sm:rounded-[3rem] sm:shadow-2xl sm:border-[8px] sm:border-slate-800 flex flex-col relative overflow-hidden text-gray-900 dark:text-white [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"> <Toaster />
 
-        {/* --- DYNAMIC PROMO POP-UP MODAL --- */}
         {promoPopup && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-2 border-amber-500/60 w-full max-w-xs rounded-[36px] p-6 text-white text-center space-y-4 shadow-2xl relative overflow-hidden">
@@ -999,14 +1132,13 @@ export default function CustomerApp() {
           </div>
         )}
 
-        {/* WALLET HISTORY POPUP MODAL */}
         {isWalletHistoryOpen && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-slate-900 border border-amber-500/50 w-full max-w-sm rounded-[32px] p-5 text-white space-y-4 shadow-2xl overflow-y-auto max-h-[85vh]">
               <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">📜</span>
-                  <h3 className="text-sm font-black text-amber-400">Complete Wallet History</h3>
+                  <span className="text-xl">💳</span>
+                  <h3 className="text-sm font-black text-amber-400">Payment & Wallet History</h3>
                 </div>
                 <button onClick={() => setIsWalletHistoryOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
                   <XCircle size={22} />
@@ -1015,7 +1147,7 @@ export default function CustomerApp() {
 
               <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
                 {paymentHistory.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-10">No transactions found.</p>
+                  <p className="text-xs text-slate-400 text-center py-10">No payment or transaction records found.</p>
                 ) : (
                   paymentHistory.map((pay, i) => (
                     <div key={i} className="bg-slate-800/80 border border-slate-700/70 p-3.5 rounded-2xl flex justify-between items-center text-xs">
@@ -1046,7 +1178,6 @@ export default function CustomerApp() {
           </div>
         )}
 
-        {/* EDIT PROFILE MODAL */}
         {isEditProfileModalOpen && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-slate-900 border border-amber-500/50 w-full max-w-sm rounded-[32px] p-6 text-white space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
@@ -1067,6 +1198,7 @@ export default function CustomerApp() {
                       const newName = e.target.value;
                       setEditProfileName(newName);
                       setAddress(prev => ({ ...prev, name: newName }));
+                      localStorage.setItem('userName', newName);
                       try {
                         await fetch(`${API_BASE_URL}/api/user/update-profile`, {
                           method: "PUT",
@@ -1119,6 +1251,7 @@ export default function CustomerApp() {
               <button 
                 onClick={async () => {
                   setAddress(prev => ({ ...prev, name: editProfileName }));
+                  localStorage.setItem('userName', editProfileName);
                   try {
                     await fetch(`${API_BASE_URL}/api/user/update-profile`, {
                       method: "PUT",
@@ -1139,7 +1272,6 @@ export default function CustomerApp() {
           </div>
         )}
 
-        {/* SCRATCH CARD HUMAN-TOUCH MODAL */}
         {activeScratchCard && (
           <div className="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-2 border-amber-500/60 w-full max-w-xs rounded-[36px] p-6 text-white text-center space-y-4 shadow-2xl relative overflow-hidden">
@@ -1152,14 +1284,12 @@ export default function CustomerApp() {
               </div>
 
               <div className="relative w-64 h-36 mx-auto rounded-3xl overflow-hidden border-2 border-amber-500/50 bg-slate-950 flex items-center justify-center shadow-inner">
-                {/* Revealed Amount */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-emerald-900 to-slate-950">
                   <span className="text-[10px] uppercase font-bold text-emerald-300">Reward Unlocked</span>
                   <span className="text-4xl font-black text-emerald-400">₹{activeScratchCard.amount}</span>
                   <span className="text-[9px] text-slate-400 mt-0.5">Added instantly to wallet</span>
                 </div>
 
-                {/* Scratch Cover Canvas */}
                 {scratchProgress < 60 && !activeScratchCard.isScratched ? (
                   <canvas
                     ref={canvasRef}
@@ -1198,7 +1328,6 @@ export default function CustomerApp() {
           </div>
         )}
 
-        {/* --- AUTHENTICATION SCREEN (LOGIN TOP, REGISTER & FORGOT DOWNSIDE) --- */}
         {!isLoggedIn ? (
           <div className="flex flex-col flex-1 w-full h-full bg-gradient-to-br from-slate-950 via-slate-900 to-[#fc8019]/30 items-center justify-center p-6 relative overflow-hidden">
             <div className="absolute top-10 right-[-20px] w-56 h-56 bg-orange-500/20 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
@@ -1222,7 +1351,6 @@ export default function CustomerApp() {
                 </div>
               </div>
 
-              {/* 1. PASSWORD LOGIN VIEW */}
               {authMode === 'login' && (
                 <form onSubmit={async (e) => {
                   e.preventDefault();
@@ -1230,17 +1358,39 @@ export default function CustomerApp() {
                     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ mobile: phone, password })
+                      body: JSON.stringify({ mobile: phone, password, role: 'customer' })
                     });
                     const data = await res.json();
                     if (res.ok) {
+                      const fetchedName = data.name && data.name.trim() !== '' ? data.name : 'User';
                       localStorage.setItem('userMobile', data.mobile || phone);
-                      localStorage.setItem('userName', data.name || 'Customer');
-                      setAddress(prev => ({ ...prev, name: data.name || 'Customer', mobile: data.mobile || phone }));
+                      localStorage.setItem('userName', fetchedName);
+                      
+                      const previousBalance = data.walletBalance !== undefined ? parseFloat(data.walletBalance) : 0.00;
+                      localStorage.setItem('foodiee_wallet_balance', previousBalance);
+                      setWalletBalance(previousBalance);
+
+                      if (data.paymentHistory) {
+                        localStorage.setItem('foodiee_payment_history', JSON.stringify(data.paymentHistory));
+                        setPaymentHistory(data.paymentHistory);
+                      }
+
+                      if (data.scratchCards) {
+                        localStorage.setItem('foodiee_saved_scratch_cards', JSON.stringify(data.scratchCards));
+                        setScratchCards(data.scratchCards);
+                      }
+
+                      const orderRes = await fetch(`${API_BASE_URL}/api/orders/customer/${data.mobile || phone}`);
+                      if (orderRes.ok) {
+                        const orderData = await orderRes.json();
+                        setBackendOrders(orderData);
+                      }
+
+                      setAddress(prev => ({ ...prev, name: fetchedName, mobile: data.mobile || phone }));
                       setIsLoggedIn(true);
-                      toast.success(`🎉 Welcome back, ${data.name || 'Customer'}!`);
+                      toast.success(`🎉 Welcome back, ${fetchedName}!`);
                     } else {
-                      toast.error(data.error || 'Invalid mobile or password');
+                      toast.error(data.error || '❌ Mobile number and Password do not match! Cannot login.');
                     }
                   } catch (err) {
                     toast.error('❌ Network error during login');
@@ -1285,7 +1435,6 @@ export default function CustomerApp() {
                     <ArrowRight size={16} />
                   </button>
 
-                  {/* DOWNSIDE OPTIONS: Forgot Password & Register New User */}
                   <div className="flex justify-between items-center pt-2 text-[11px] font-bold">
                     <span onClick={() => setAuthMode('forgot')} className="text-blue-400 underline cursor-pointer hover:text-blue-300">
                       Forgot Password?
@@ -1297,18 +1446,52 @@ export default function CustomerApp() {
                 </form>
               )}
 
-              {/* 2. REGISTRATION VIEW */}
               {authMode === 'register' && (
                 <form onSubmit={async (e) => {
                   e.preventDefault();
+                  
+                  const pwdRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{6,}$/;
+                  if (!pwdRegex.test(password)) {
+                    toast.error('❌ Password must be at least 6 characters long and contain letters, numbers, and special characters!');
+                    return;
+                  }
+
                   try {
                     const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ mobile: phone, name, password, role: 'Customer' })
+                      body: JSON.stringify({ mobile: phone, name: name.trim(), password, role: 'Customer', walletBalance: 0.00, paymentHistory: [], scratchCards: [] })
                     });
                     const data = await res.json();
                     if (res.ok) {
+                      localStorage.setItem('userName', name.trim());
+                      localStorage.setItem('foodiee_wallet_balance', '0.00');
+                      setWalletBalance(0.00);
+
+                      localStorage.setItem('foodiee_payment_history', JSON.stringify([]));
+                      setPaymentHistory([]);
+
+                      localStorage.setItem('foodiee_saved_scratch_cards', JSON.stringify([]));
+                      setScratchCards([]);
+
+                      setBackendOrders([]);
+
+                      localStorage.removeItem('foodiee_active_address');
+                      localStorage.removeItem('foodiee_multiple_addresses');
+                      setSavedAddresses([]);
+                      setAddress({
+                        name: name.trim(),
+                        mobile: phone,
+                        houseNo: '',
+                        street: '',
+                        landmark: '',
+                        district: '',
+                        state: '',
+                        pincode: '',
+                        latitude: 18.5793,
+                        longitude: 84.4452
+                      });
+
                       toast.success('✓ Registration successful! Please login.');
                       setAuthMode('login');
                     } else {
@@ -1344,12 +1527,12 @@ export default function CustomerApp() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Create Password</label>
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Create Password (Min 6, Letters, Numbers, Special)</label>
                     <input 
                       type="password" 
                       value={password} 
                       onChange={(e) => setPassword(e.target.value)} 
-                      placeholder="Create secure password" 
+                      placeholder="e.g. Pass@123" 
                       className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-xs font-bold text-white outline-none" 
                       required 
                     />
@@ -1371,15 +1554,20 @@ export default function CustomerApp() {
                 </form>
               )}
 
-              {/* 3. FORGOT / RESET PASSWORD VIEW */}
               {authMode === 'forgot' && (
                 <form onSubmit={async (e) => {
                   e.preventDefault();
+                  const pwdRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{6,}$/;
+                  if (!pwdRegex.test(newPassword)) {
+                    toast.error('❌ Password must be at least 6 characters long and contain letters, numbers, and special characters!');
+                    return;
+                  }
+
                   try {
                     const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ mobile: phone, newPassword })
+                      body: JSON.stringify({ mobile: phone, newPassword, role: 'customer' })
                     });
                     const data = await res.json();
                     if (res.ok) {
@@ -1406,12 +1594,12 @@ export default function CustomerApp() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">New Password</label>
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">New Password (Min 6, Letters, Numbers, Special)</label>
                     <input 
                       type="password" 
                       value={newPassword} 
                       onChange={(e) => setNewPassword(e.target.value)} 
-                      placeholder="Enter new password" 
+                      placeholder="e.g. NewPass@123" 
                       className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3.5 rounded-2xl text-xs font-bold text-white outline-none" 
                       required 
                     />
@@ -1439,7 +1627,6 @@ export default function CustomerApp() {
             darkMode ? 'bg-slate-900 text-white' : 'bg-gradient-to-br from-slate-50 via-gray-100 to-orange-50/40 text-gray-900'
           }`}>
 
-            {/* HEADER */}
             <header className={`${darkMode ? 'bg-slate-800/90 border-slate-700' : 'bg-white/90 border-b'} backdrop-blur-md border-b px-3 py-2.5 shrink-0 shadow-sm z-30 space-y-1.5`}>
               <div className="flex items-center justify-between">
                 <button
@@ -1500,7 +1687,6 @@ export default function CustomerApp() {
               </div>
             </header>
 
-            {/* NOTIFICATIONS MODAL */}
             {showNotificationModal && (
               <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
                 <div className={`${darkMode ? 'bg-slate-800 text-white' : 'bg-white text-gray-900'} w-full max-w-xs p-5 rounded-3xl shadow-2xl space-y-4 text-xs`}>
@@ -1528,17 +1714,16 @@ export default function CustomerApp() {
               </div>
             )}
 
-            {/* SIDE DRAWER */}
             {isDrawerOpen && (
               <div className="absolute inset-0 z-50 flex justify-end">
                 <div className={`${darkMode ? 'bg-slate-800 text-white' : 'bg-white text-gray-900'} w-64 h-full shadow-2xl p-4 flex flex-col justify-between space-y-4 animate-fadeIn`}>
-                  <div className="space-y-4">
+                  <div className="space-y-4 flex-1 overflow-y-auto">
                     <div className="flex justify-between items-center border-b border-gray-200 dark:border-slate-700 pb-3">
                       <div className="flex items-center gap-2">
                         <img src={userPhoto} alt="Profile" className="w-9 h-9 rounded-full border border-[#fc8019] object-cover" />
                         <div>
-                          <h3 className="text-xs font-black">{address.name}</h3>
-                          <p className="text-[10px] text-gray-400">{address.mobile}</p>
+                          <h3 className="text-xs font-black">{address.name || localStorage.getItem('userName') || 'User'}</h3>
+                          <p className="text-[10px] text-gray-400">{address.mobile || phone || localStorage.getItem('userMobile')}</p>
                         </div>
                       </div>
                       <button onClick={() => setIsDrawerOpen(false)} className="text-xs font-bold text-gray-400">✕</button>
@@ -1547,7 +1732,7 @@ export default function CustomerApp() {
                     <div className="space-y-1 text-xs font-bold">
                       <label className="flex items-center gap-2 p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer">
                         <Camera size={15} className="text-[#fc8019]" />
-                        <span>Upload photo to DB</span>
+                        <span>Upload photo</span>
                         <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
                       </label>
                       <button onClick={() => { setActiveTab('wallet'); setIsDrawerOpen(false); }} className="w-full text-left p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2">
@@ -1560,10 +1745,13 @@ export default function CustomerApp() {
                         <Clock size={15} className="text-[#fc8019]" /> Order History
                       </button>
                       <button onClick={() => { setActiveTab('offers'); setIsDrawerOpen(false); }} className="w-full text-left p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2">
-                        <Gift size={15} className="text-[#fc8019]" /> Offers & Rewards (* Scratch Cards)
+                        <Gift size={15} className="text-[#fc8019]" /> Offers & Rewards 
                       </button>
                       <button onClick={() => { setActiveTab('address'); setIsDrawerOpen(false); }} className="w-full text-left p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2">
                         <MapPin size={15} className="text-[#fc8019]" /> Saved Address
+                      </button>
+                      <button onClick={() => { setActiveTab('profile'); setIsDrawerOpen(false); }} className="w-full text-left p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2">
+                        <User size={15} className="text-[#fc8019]" /> Payment Details & Profile
                       </button>
                       <button onClick={() => { setIsSupportChatOpen(true); setIsDrawerOpen(false); }} className="w-full text-left p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2">
                         <MessageCircle size={15} className="text-[#fc8019]" /> Live Support Chat
@@ -1571,22 +1759,23 @@ export default function CustomerApp() {
                     </div>
                   </div>
 
-                  <button 
-                    onClick={() => { 
-                      localStorage.removeItem('userMobile'); 
-                      localStorage.removeItem('userName'); 
-                      setIsLoggedIn(false); 
-                    }} 
-                    className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-4 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
-                  >
-                    <LogOut size={16} /> Logout from Foodiee
-                  </button>
+                  <div className="pt-2 pb-6 shrink-0 border-t border-gray-200 dark:border-slate-700 mt-auto">
+                    <button 
+                      onClick={() => { 
+                        localStorage.removeItem('userMobile'); 
+                        localStorage.removeItem('userName'); 
+                        setIsLoggedIn(false); 
+                      }} 
+                      className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-3.5 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+                    >
+                      <LogOut size={12} /> Logout from Foodiee
+                    </button>
+                  </div>
                 </div>
                 <div className="flex-1 bg-black/40" onClick={() => setIsDrawerOpen(false)}></div>
               </div>
             )}
 
-            {/* RATING MODAL */}
             {ratingModal && (
               <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                 <div className={`${darkMode ? 'bg-slate-800 text-white' : 'bg-white text-gray-900'} w-full max-w-xs p-4 rounded-3xl shadow-2xl space-y-3 text-xs`}>
@@ -1610,7 +1799,6 @@ export default function CustomerApp() {
               </div>
             )}
 
-            {/* ADD MONEY MODAL */}
             {isAddMoneyModalOpen && (
               <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
                 <div className="bg-slate-900 border border-amber-500/50 w-full max-w-sm rounded-3xl p-6 text-white space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
@@ -1647,26 +1835,27 @@ export default function CustomerApp() {
               </div>
             )}
 
-            {/* SUPPORT CHAT MODAL */}
             {isSupportChatOpen && (
               <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
-                <div className="bg-slate-900 border border-slate-700 w-full max-w-sm h-[500px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl relative">
-                  <div className="bg-[#fc8019] p-4 text-slate-950 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">💬</span>
-                      <h3 className="font-black text-xs uppercase">Foodiee Customer Support</h3>
+                <div className="bg-slate-900 border border-slate-700 w-full max-w-sm h-[520px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl relative">
+                  <div className="bg-[#075e54] p-4 text-white flex justify-between items-center shadow-md">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white font-black text-sm">💬</div>
+                      <div>
+                        <h3 className="font-black text-xs uppercase tracking-wide">Foodiee WhatsApp Support</h3>
+                        <p className="text-[9px] text-emerald-200">Online • Fast Response</p>
+                      </div>
                     </div>
-                    <button onClick={() => setIsSupportChatOpen(false)} className="text-slate-950 font-black cursor-pointer">✕</button>
+                    <button onClick={() => setIsSupportChatOpen(false)} className="text-white font-black cursor-pointer p-1">✕</button>
                   </div>
 
-                  <div className="flex-1 overflow-hidden bg-slate-950">
+                  <div className="flex-1 overflow-hidden bg-[#efeae2] dark:bg-slate-950">
                     <CustomerSupportChat userMobile={phone || localStorage.getItem('userMobile')} />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* FLOATING SUPPORT CHAT BUTTON WITH UNREAD COUNT & BLINKING DOT */}
             <div className="absolute bottom-20 right-4 z-40">
               <button 
                 onClick={() => {
@@ -1689,23 +1878,43 @@ export default function CustomerApp() {
               </button>
             </div>
 
-            {/* --- REAL-TIME ORDER CHAT MODAL --- */}
             {activeChatRecipient && activeTrackingOrder && (
-              <OrderChatModal 
-                orderId={activeTrackingOrder.orderId || activeTrackingOrder.id} 
-                userMobile={address.mobile || phone || localStorage.getItem('userMobile')} 
-                userRole="customer" 
-                recipientRole={activeChatRecipient} 
-                orderStatus={activeTrackingOrder.status}
-                onClose={() => setActiveChatRecipient(null)} 
-              />
+              <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
+                <div className="bg-slate-900 border border-slate-700 w-full max-w-sm h-[520px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl relative">
+                  <div className="bg-[#075e54] p-4 text-white flex justify-between items-center shadow-md">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white font-black text-sm">
+                        {activeChatRecipient === 'partner' ? '🛵' : '🏪'}
+                      </div>
+                      <div>
+                        <h3 className="font-black text-xs uppercase tracking-wide">
+                          {activeChatRecipient === 'partner' ? 'Delivery Partner Chat' : 'Shop Owner Chat'}
+                        </h3>
+                        <p className="text-[9px] text-emerald-200">WhatsApp Style Live Chat</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setActiveChatRecipient(null)} className="text-white font-black cursor-pointer p-1">✕</button>
+                  </div>
+
+                  <div className="flex-1 overflow-hidden bg-[#efeae2] dark:bg-slate-950">
+                    <OrderChatModal 
+                      orderId={activeTrackingOrder.orderId || activeTrackingOrder.id} 
+                      userMobile={address.mobile || phone || localStorage.getItem('userMobile')} 
+                      userRole="customer" 
+                      recipientRole={activeChatRecipient} 
+                      orderStatus={activeTrackingOrder.status}
+                      onClose={() => setActiveChatRecipient(null)} 
+                    />
+                  </div>
+                </div>
+              </div>
             )}
 
-            {/* MAIN CONTENT */}
-            <main className={`flex-1 overflow-y-auto p-4 space-y-4 pb-28 transition-colors duration-500 ${
-              selectedCategory === 'Food' ? (darkMode ? 'bg-amber-950/30' : 'bg-amber-50/80') :
-              selectedCategory === 'Grocery' ? (darkMode ? 'bg-emerald-950/30' : 'bg-emerald-50/80') :
-              selectedCategory === 'Meat & Fish' ? (darkMode ? 'bg-rose-950/30' : 'bg-rose-50/80') : ''
+            <main className={`flex-1 overflow-y-auto p-4 space-y-4 pb-28 transition-colors duration-500 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${
+              selectedCategory === 'Food' ? (darkMode ? 'bg-amber-950/40' : 'bg-amber-50/90') :
+              selectedCategory === 'Grocery' ? (darkMode ? 'bg-emerald-950/40' : 'bg-emerald-50/90') :
+              selectedCategory === 'Meat & Fish' ? (darkMode ? 'bg-rose-950/40' : 'bg-rose-50/90') : 
+              (darkMode ? 'bg-slate-900 text-white' : 'bg-gradient-to-br from-slate-50 via-gray-100 to-orange-50/40 text-gray-900')
             }`}>
 
               {successReceipt && (
@@ -1715,7 +1924,41 @@ export default function CustomerApp() {
                 </div>
               )}
 
-              {/* LIVE TRACKING VIEW */}
+              {searchQuery.trim() !== '' && (
+                <div className="space-y-3 animate-fadeIn">
+                  <div className="flex justify-between items-center px-1">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-amber-400">
+                      Search Results for "{searchQuery}" ({dynamicShops.length} Stores Found)
+                    </h3>
+                    <button onClick={() => setSearchQuery('')} className="text-[10px] text-rose-400 font-bold underline cursor-pointer">
+                      Clear Search ❌
+                    </button>
+                  </div>
+
+                  {dynamicShops.length === 0 ? (
+                    <div className="text-center py-16 bg-slate-900/60 rounded-3xl border border-slate-800 space-y-2">
+                      <span className="text-3xl">🔍</span>
+                      <p className="text-xs text-slate-400 font-bold">No shops or dishes found matching "{searchQuery}".</p>
+                    </div>
+                  ) : (
+                    dynamicShops.map(shop => (
+                      <div 
+                        key={shop.id} 
+                        onClick={() => { setSelectedCategory(shop.category || 'Food'); setSelectedShop(shop); setSearchQuery(''); }} 
+                        className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-lg cursor-pointer hover:border-amber-500/50 transition"
+                      >
+                        <img src={shop.imageUrl} alt={shop.name} className="w-12 h-12 rounded-xl object-cover border border-slate-700" />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-black text-white truncate">{shop.name}</h4>
+                          <p className="text-[10px] text-slate-400">{shop.category} • ⚡ {shop.time}</p>
+                        </div>
+                        <ChevronRight size={16} className="text-amber-400 shrink-0" />
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
               {activeTrackingOrder ? (
                 (() => {
                   const shopLat = activeTrackingOrder.shopLat || activeTrackingOrder.shop_lat || 18.5793;
@@ -1793,13 +2036,12 @@ export default function CustomerApp() {
                             </div>
                           )}
 
-                          {/* --- CHAT BUTTONS FOR CUSTOMER --- */}
                           <div className="grid grid-cols-2 gap-2">
                             <button 
                               onClick={() => { setActiveChatRecipient('partner'); setUnreadOrderCount(0); }} 
-                              className="bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow relative"
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow relative"
                             >
-                              <Bike size={14} /> Chat with Delivery
+                              <Bike size={14} /> WhatsApp Chat (Rider)
                               {unreadOrderCount > 0 && (
                                 <span className="absolute -top-1 -right-1 bg-red-600 text-white font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
                                   {unreadOrderCount}
@@ -1809,9 +2051,9 @@ export default function CustomerApp() {
 
                             <button 
                               onClick={() => { setActiveChatRecipient('shop'); setUnreadOrderCount(0); }} 
-                              className="bg-[#fc8019] hover:bg-[#e07015] text-slate-950 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow relative"
+                              className="bg-[#075e54] hover:bg-[#054c44] text-white py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow relative"
                             >
-                              <Store size={14} /> Chat with Shop
+                              <Store size={14} /> WhatsApp Chat (Shop)
                             </button>
                           </div>
 
@@ -1863,10 +2105,16 @@ export default function CustomerApp() {
 
                     {!isEditingAddress ? (
                       <div className="space-y-0.5">
-                        <p className="text-xs font-bold">{address.name} ({address.mobile})</p>
-                        <p className="text-[11px] text-gray-400">
-                          {address.houseNo ? `${address.houseNo}, ` : ''}{address.street}, {address.landmark ? `Near ${address.landmark}, ` : ''}{address.district}, {address.state} - {address.pincode}
-                        </p>
+                        {address.street ? (
+                          <>
+                            <p className="text-xs font-bold">{address.name || localStorage.getItem('userName')} ({address.mobile || phone})</p>
+                            <p className="text-[11px] text-gray-400">
+                              {address.houseNo ? `${address.houseNo}, ` : ''}{address.street}, {address.landmark ? `Near ${address.landmark}, ` : ''}{address.district}, {address.state} - {address.pincode}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-orange-400 font-bold">⚠️ No delivery address set. Click 'Edit / GPS 📍' to add one.</p>
+                        )}
                       </div>
                     ) : (
                       <form onSubmit={handleSaveEditedAddress} className="space-y-2 pt-1 border-t border-slate-700 text-xs">
@@ -1885,7 +2133,7 @@ export default function CustomerApp() {
                         </div>
                         <div>
                           <label className="text-[9px] text-slate-400 font-bold uppercase">Apartment / Area</label>
-                          <input type="text" value={editableAddress.street} onChange={(e) => setEditableAddress({...editableAddress, street: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
+                          <input type="text" value={editableAddress.street || ''} onChange={(e) => setEditableAddress({...editableAddress, street: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
                         </div>
                         <div>
                           <label className="text-[9px] text-slate-400 font-bold uppercase">Landmark</label>
@@ -1894,11 +2142,11 @@ export default function CustomerApp() {
                         <div className="flex gap-2">
                           <div className="flex-1">
                             <label className="text-[9px] text-slate-400 font-bold uppercase">District</label>
-                            <input type="text" value={editableAddress.district} onChange={(e) => setEditableAddress({...editableAddress, district: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
+                            <input type="text" value={editableAddress.district || ''} onChange={(e) => setEditableAddress({...editableAddress, district: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
                           </div>
                           <div className="w-24">
                             <label className="text-[9px] text-slate-400 font-bold uppercase">Pincode</label>
-                            <input type="text" value={editableAddress.pincode} onChange={(e) => setEditableAddress({...editableAddress, pincode: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
+                            <input type="text" value={editableAddress.pincode || ''} onChange={(e) => setEditableAddress({...editableAddress, pincode: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
                           </div>
                         </div>
                         <button type="submit" className="w-full bg-[#fc8019] text-slate-950 py-2 rounded-xl font-black text-xs shadow cursor-pointer">Save Address & Name</button>
@@ -1906,25 +2154,47 @@ export default function CustomerApp() {
                     )}
                   </div>
 
-                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} p-3 rounded-2xl border shadow-sm space-y-2 text-xs`}>
+                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900'} p-3 rounded-2xl border shadow-sm space-y-2 text-xs`}>
                     <div className="flex justify-between items-center">
-                      <span className="font-extrabold text-gray-400 uppercase flex items-center gap-1"><Users size={13} /> Split Bill</span>
+                      <span className="font-extrabold text-gray-400 uppercase flex items-center gap-1">
+                        <Users size={13} /> Split Bill
+                      </span>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setSplitPeople(Math.max(1, splitPeople - 1))} className="border px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-700 font-bold">-</button>
-                        <span className="font-black">{splitPeople} People</span>
-                        <button onClick={() => setSplitPeople(splitPeople + 1)} className="border px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-700 font-bold">+</button>
+                        <button 
+                          onClick={() => setSplitPeople(Math.max(1, splitPeople - 1))} 
+                          className="w-7 h-7 flex items-center justify-center border rounded-lg bg-slate-200 dark:bg-slate-700 text-gray-900 dark:text-white font-black hover:bg-slate-300 dark:hover:bg-slate-600 transition cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <span className="font-black text-gray-900 dark:text-white px-1">{splitPeople} People</span>
+                        <button 
+                          onClick={() => setSplitPeople(splitPeople + 1)} 
+                          className="w-7 h-7 flex items-center justify-center border rounded-lg bg-slate-200 dark:bg-slate-700 text-gray-900 dark:text-white font-black hover:bg-slate-300 dark:hover:bg-slate-600 transition cursor-pointer"
+                        >
+                          +
+                        </button>
                       </div>
                     </div>
                     {splitPeople > 1 && (
-                      <p className="text-emerald-600 font-bold text-[11px]">Each pays: ₹{splitAmount}</p>
+                      <p className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
+                        Each pays: ₹{splitAmount}
+                      </p>
                     )}
                   </div>
 
-                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} p-3 rounded-2xl border shadow-sm space-y-2 text-xs`}>
+                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900'} p-3 rounded-2xl border shadow-sm space-y-2 text-xs`}>
                     <span className="font-extrabold text-gray-400 uppercase">Tip Rider 🛵</span>
                     <div className="grid grid-cols-4 gap-2">
                       {[0, 10, 20, 50].map((t) => (
-                        <button key={t} onClick={() => setRiderTip(t)} className={`p-2 rounded-xl font-bold border ${riderTip === t ? 'bg-[#fc8019] text-white border-[#fc8019]' : 'bg-gray-50 dark:bg-slate-700 border-gray-200'}`}>
+                        <button 
+                          key={t} 
+                          onClick={() => setRiderTip(t)} 
+                          className={`p-2 rounded-xl font-bold border transition cursor-pointer ${
+                            riderTip === t 
+                              ? 'bg-[#fc8019] text-white border-[#fc8019]' 
+                              : 'bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-slate-600'
+                          }`}
+                        >
                           {t === 0 ? 'None' : `₹${t}`}
                         </button>
                       ))}
@@ -1951,11 +2221,11 @@ export default function CustomerApp() {
                         <span>Delivery</span>
                         <span className="font-bold">₹{deliveryFee}</span>
                       </div>
-                      {discount > 0 && (
-                        <div className="flex justify-between text-emerald-600 font-bold">
-                          <span>Discount</span>
-                          <span>-₹{discount}</span>
-                        </div>
+                     {discount > 0 && (
+                     <div className="flex justify-between items-center text-emerald-600 font-bold">
+                    <span>Discount {promoCode && `(${promoCode.toUpperCase()})`}</span>
+                    <span>-₹{discount}</span>
+                    </div>
                       )}
                       <div className="pt-2 border-t border-dashed flex justify-between items-center text-xs font-black">
                         <span>To Pay</span>
@@ -1964,7 +2234,6 @@ export default function CustomerApp() {
                     </div>
                   </div>
 
-                  {/* AVAILABLE PROMO CODES SECTION */}
                   <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} p-3 rounded-2xl border shadow-sm space-y-2 text-xs`}>
                     <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider">Available Promo Codes</span>
                     
@@ -2042,19 +2311,23 @@ export default function CustomerApp() {
                   </div>
 
                   <div className="space-y-2.5">
-                    {savedAddresses.map((addr) => (
-                      <div key={addr.id} className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-slate-700/80 p-4 rounded-[24px] shadow-xl flex justify-between items-start relative overflow-hidden group hover:border-[#fc8019] transition-all">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500/10 rounded-full blur-xl group-hover:bg-orange-500/20 transition-all"></div>
-                        <div className="space-y-1 relative z-10">
-                          <span className="bg-[#fc8019]/20 text-[#fc8019] text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">{addr.type}</span>
-                          <p className="font-black text-white mt-1 text-xs">{addr.name} • <span className="text-slate-400 font-medium">{addr.mobile}</span></p>
-                          <p className="text-[11px] text-slate-300 leading-relaxed">
-                            {addr.houseNo ? `${addr.houseNo}, ` : ''}{addr.street}, {addr.landmark ? `Near ${addr.landmark}, ` : ''}{addr.district}, {addr.state} - {addr.pincode}
-                          </p>
+                    {savedAddresses.length === 0 ? (
+                      <p className="text-slate-400 text-center py-4">No saved addresses found. Add one below!</p>
+                    ) : (
+                      savedAddresses.map((addr) => (
+                        <div key={addr.id} className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-slate-700/80 p-4 rounded-[24px] shadow-xl flex justify-between items-start relative overflow-hidden group hover:border-[#fc8019] transition-all">
+                          <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500/10 rounded-full blur-xl group-hover:bg-orange-500/20 transition-all"></div>
+                          <div className="space-y-1 relative z-10">
+                            <span className="bg-[#fc8019]/20 text-[#fc8019] text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">{addr.type}</span>
+                            <p className="font-black text-white mt-1 text-xs">{addr.name || localStorage.getItem('userName')} • <span className="text-slate-400 font-medium">{addr.mobile}</span></p>
+                            <p className="text-[11px] text-slate-300 leading-relaxed">
+                              {addr.houseNo ? `${addr.houseNo}, ` : ''}{addr.street}, {addr.landmark ? `Near ${addr.landmark}, ` : ''}{addr.district}, {addr.state} - {addr.pincode}
+                            </p>
+                          </div>
+                          <button onClick={() => { setAddress(addr); toast.success(`✓ Active delivery address set to ${addr.type}`); }} className="bg-slate-800 hover:bg-[#fc8019] text-white hover:text-slate-950 px-3 py-1.5 rounded-xl text-[10px] font-black transition cursor-pointer shadow-md relative z-10">Select</button>
                         </div>
-                        <button onClick={() => { setAddress(addr); toast.success(`✓ Active delivery address set to ${addr.type}`); }} className="bg-slate-800 hover:bg-[#fc8019] text-white hover:text-slate-950 px-3 py-1.5 rounded-xl text-[10px] font-black transition cursor-pointer shadow-md relative z-10">Select</button>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
 
                   <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-amber-500/40 p-5 rounded-[32px] space-y-3.5 shadow-2xl relative overflow-hidden mt-4">
@@ -2168,34 +2441,57 @@ export default function CustomerApp() {
                 </div>
               ) : activeTab === 'home' && !selectedCategory ? (
                 <div className="space-y-4 pb-4">
-                  <div className="space-y-3 pt-1">
-                    <div className="flex items-center justify-between px-1">
-                      <h3 className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Explore Categories</h3>
-                      <span className="text-[10px] text-[#fc8019] font-bold">Ichapuram Specials</span>
-                    </div>
+                 <div className="space-y-3 pt-1">
+  <div className="flex items-center justify-between px-1">
+    <h3 className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Explore Categories</h3>
+    <span className="text-[10px] text-[#fc8019] font-bold"></span>
+  </div>
 
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { name: 'Food', icon: '🍚', desc: 'Biryani & Tiffins', lightBg: 'bg-amber-50 border-amber-300 text-slate-900', darkBg: 'bg-gradient-to-br from-amber-500/20 via-slate-900 to-slate-900 border-amber-500/50 text-white', accent: 'bg-amber-500' },
-                        { name: 'Grocery', icon: '🛒', desc: 'Daily Essentials', lightBg: 'bg-emerald-50 border-emerald-300 text-slate-900', darkBg: 'bg-gradient-to-br from-emerald-500/20 via-slate-900 to-slate-900 border-emerald-500/50 text-white', accent: 'bg-emerald-500' },
-                        { name: 'Meat & Fish', icon: '🥩', desc: 'Chicken, Mutton & Fish', lightBg: 'bg-rose-50 border-rose-300 text-slate-900', darkBg: 'bg-gradient-to-br from-rose-500/20 via-slate-900 to-slate-900 border-rose-500/50 text-white', accent: 'bg-rose-500' }
-                      ].map(cat => (
-                        <button 
-                          key={cat.name} 
-                          onClick={() => setSelectedCategory(cat.name)} 
-                          className={`relative group overflow-hidden border-2 p-3.5 rounded-[28px] flex flex-col items-center text-center shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer backdrop-blur-xl ${
-                            darkMode ? cat.darkBg : cat.lightBg
-                          }`}
-                        >
-                          <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center text-2xl mb-2 group-hover:scale-110 transition-transform duration-300 border border-gray-200 dark:border-slate-700">
-                            {cat.icon}
-                          </div>
-                          <span className={`text-xs font-black tracking-tight group-hover:text-[#fc8019] transition-colors ${darkMode ? 'text-white' : 'text-gray-900'}`}>{cat.name}</span>
-                          <div className={`w-3 h-1 rounded-full ${cat.accent} mt-2 group-hover:w-6 transition-all duration-300`}></div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+  <div className="grid grid-cols-3 gap-3">
+    {[
+      { 
+        name: 'Food', 
+        icon: '🍚', 
+        desc: 'Biryani & Tiffins', 
+        lightBg: 'bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 border-amber-500 text-slate-950 shadow-xl shadow-amber-500/30', 
+        darkBg: 'bg-gradient-to-br from-amber-500 via-orange-600 to-amber-700 border-amber-300 text-white shadow-[0_0_25px_rgba(245,158,11,0.5)]', 
+        accent: 'bg-white shadow-[0_0_12px_#ffffff]' 
+      },
+      { 
+        name: 'Grocery', 
+        icon: '🛒', 
+        desc: 'Daily Essentials', 
+        lightBg: 'bg-gradient-to-br from-emerald-400 via-teal-400 to-emerald-500 border-emerald-500 text-slate-950 shadow-xl shadow-emerald-500/30', 
+        darkBg: 'bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-700 border-emerald-300 text-white shadow-[0_0_25px_rgba(16,185,129,0.5)]', 
+        accent: 'bg-white shadow-[0_0_12px_#ffffff]' 
+      },
+      { 
+        name: 'Meat & Fish', 
+        icon: '🥩', 
+        desc: 'Chicken, Mutton & Fish', 
+        lightBg: 'bg-gradient-to-br from-rose-400 via-pink-400 to-rose-500 border-rose-500 text-slate-950 shadow-xl shadow-rose-500/30', 
+        darkBg: 'bg-gradient-to-br from-rose-500 via-pink-600 to-rose-700 border-rose-300 text-white shadow-[0_0_25px_rgba(244,63,94,0.5)]', 
+        accent: 'bg-white shadow-[0_0_12px_#ffffff]' 
+      }
+    ].map(cat => (
+      <button 
+        key={cat.name} 
+        onClick={() => setSelectedCategory(cat.name)} 
+        className={`relative group overflow-hidden border-2 p-4 rounded-[30px] flex flex-col items-center text-center hover:-translate-y-2 transition-all duration-300 cursor-pointer backdrop-blur-2xl ${
+          darkMode ? cat.darkBg : cat.lightBg
+        }`}
+      >
+        <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+
+        <div className="w-14 h-14 rounded-2xl bg-white/95 dark:bg-slate-900/90 shadow-lg flex items-center justify-center text-2xl mb-2 group-hover:scale-110 transition-transform duration-300 border border-white/40">
+          {cat.icon}
+        </div>
+        <span className="text-xs font-black tracking-tight drop-shadow-sm">{cat.name}</span>
+        <div className={`w-5 h-1.5 rounded-full ${cat.accent} mt-2 group-hover:w-10 transition-all duration-300`}></div>
+      </button>
+    ))}
+  </div>
+</div>
 
                   <div className="flex gap-2 overflow-x-auto pb-1 pt-1">
                     {['All', '🔥 Trending', '⚡ Fast Delivery', '⭐ Top Rated'].map((filter) => (
@@ -2381,10 +2677,6 @@ export default function CustomerApp() {
                                     {shop.address}
                                   </p>
                                 </div>
-                                
-                                <div className="bg-emerald-600 text-white text-[11px] font-black px-2.5 py-1 rounded-xl shadow-lg flex items-center gap-1 shrink-0 border border-emerald-400/30">
-                                  <span>★</span> {shop.rating.replace(' ⭐', '')}
-                                </div>
                               </div>
                             </div>
 
@@ -2408,7 +2700,6 @@ export default function CustomerApp() {
                     <ArrowLeft size={14} /> Back to Shops
                   </button>
 
-                  {/* --- RENDER AUTO-SLIDING BANNER USING SUB-COMPONENT --- */}
                   <ShopBannerSlider selectedShop={selectedShop} />
 
                   {Object.keys(selectedShop.categories).length === 0 ? (
@@ -2476,8 +2767,8 @@ export default function CustomerApp() {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-base shadow-inner">📜</div>
                         <div className="text-left">
-                          <h4 className="text-xs font-black text-white group-hover:text-amber-400 transition-colors">Wallet History</h4>
-                          <p className="text-[10px] text-slate-400">View all past credits & debits</p>
+                          <h4 className="text-xs font-black text-white group-hover:text-amber-400 transition-colors">Wallet History (with Txn ID & Time)</h4>
+                          <p className="text-[10px] text-slate-400">View all past credits & debits with timestamps</p>
                         </div>
                       </div>
                       <div className="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 flex items-center justify-center group-hover:translate-x-1 transition-transform">
@@ -2536,11 +2827,11 @@ export default function CustomerApp() {
                     <div className="flex items-center gap-4 relative z-10">
                       <img src={userPhoto} alt="Profile" className="w-16 h-16 rounded-2xl border-2 border-[#fc8019] object-cover shadow-lg shrink-0" />
                       <div className="flex-1 min-w-0 space-y-1">
-                        <h3 className="font-black text-base text-white truncate">{address.name || 'Foodiee User'}</h3>
+                        <h3 className="font-black text-base text-white truncate">{address.name || localStorage.getItem('userName') || 'Foodiee User'}</h3>
                         <p className="text-slate-400 text-xs font-bold">+91 {address.mobile || phone || localStorage.getItem('userMobile')}</p>
                         <button 
                           onClick={() => {
-                            setEditProfileName(address.name || '');
+                            setEditProfileName(address.name || localStorage.getItem('userName') || '');
                             setIsEditProfileModalOpen(true);
                           }} 
                           className="text-[10px] text-[#fc8019] font-black underline cursor-pointer hover:text-orange-400"
@@ -2572,23 +2863,23 @@ export default function CustomerApp() {
                   </div>
 
                   <div className="bg-slate-900/90 border border-slate-800 rounded-[32px] p-3 space-y-1 shadow-lg">
-                    <button onClick={() => setActiveTab('address')} className="w-full flex items-center justify-between p-3.5 rounded-2xl hover:bg-slate-800/80 transition cursor-pointer">
+                    <button onClick={() => setIsWalletHistoryOpen(true)} className="w-full flex items-center justify-between p-3.5 rounded-2xl hover:bg-slate-800/80 transition cursor-pointer">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-orange-500/20 text-[#fc8019] flex items-center justify-center font-bold text-sm">📍</div>
+                        <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">💳</div>
                         <div className="text-left">
-                          <p className="font-black text-white text-xs">Addresses</p>
-                          <p className="text-[10px] text-slate-400">Share, edit & add new delivery locations</p>
+                          <p className="font-black text-white text-xs">Payment Details & Transactions</p>
+                          <p className="text-[10px] text-slate-400">View all wallet history, order payments & IDs</p>
                         </div>
                       </div>
                       <ChevronRight size={16} className="text-slate-400" />
                     </button>
 
-                    <button onClick={() => setIsWalletHistoryOpen(true)} className="w-full flex items-center justify-between p-3.5 rounded-2xl hover:bg-slate-800/80 transition cursor-pointer">
+                    <button onClick={() => setActiveTab('address')} className="w-full flex items-center justify-between p-3.5 rounded-2xl hover:bg-slate-800/80 transition cursor-pointer">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm">📜</div>
+                        <div className="w-9 h-9 rounded-xl bg-orange-500/20 text-[#fc8019] flex items-center justify-center font-bold text-sm">📍</div>
                         <div className="text-left">
-                          <p className="font-black text-white text-xs">Payment & Wallet History</p>
-                          <p className="text-[10px] text-slate-400">View transaction records & refunds</p>
+                          <p className="font-black text-white text-xs">Saved Addresses</p>
+                          <p className="text-[10px] text-slate-400">Share, edit & add new delivery locations</p>
                         </div>
                       </div>
                       <ChevronRight size={16} className="text-slate-400" />
@@ -2608,7 +2899,7 @@ export default function CustomerApp() {
 
                   <div className="pt-1">
                     <button 
-                      onClick={() => { setIsLoggedIn(false); localStorage.removeItem('userMobile'); }} 
+                      onClick={() => { setIsLoggedIn(false); localStorage.removeItem('userMobile'); localStorage.removeItem('userName'); }} 
                       className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-4 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
                     >
                       <LogOut size={16} /> Logout from Foodiee
@@ -2619,7 +2910,6 @@ export default function CustomerApp() {
 
             </main>
 
-            {/* FLOATING PROCEED TO PAY BAR */}
             {!isPaymentScreen && !activeTrackingOrder && selectedCategory !== 'Print' && cart.length > 0 && (
               <div className="absolute bottom-14 inset-x-0 p-3 bg-slate-900/90 backdrop-blur-xl border-t border-slate-800 z-40 shadow-2xl">
                 <div className="bg-slate-950 text-white p-2.5 rounded-2xl flex justify-between items-center shadow-inner border border-slate-800">
@@ -2627,14 +2917,13 @@ export default function CustomerApp() {
                     <p className="text-[9px] text-slate-400 font-extrabold uppercase">{cart.reduce((a, b) => a + b.qty, 0)} Items Added</p>
                     <p className="text-xs font-black text-[#fc8019]">₹{subtotal + deliveryFee}</p>
                   </div>
-                  <button onClick={() => setIsPaymentScreen(true)} className="bg-gradient-to-r from-[#fc8019] to-amber-500 text-slate-950 px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1 shadow-md">
+                  <button onClick={() => setIsPaymentScreen(true)} className="bg-gradient-to-r from-[#fc8019] to-amber-500 text-slate-950 px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1 shadow-md cursor-pointer">
                     <span>Proceed to Pay</span> <ChevronRight size={14} />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* FIXED BOTTOM NAVIGATION BAR */}
             <nav className={`absolute bottom-0 inset-x-0 h-14 ${darkMode ? 'bg-slate-800/95 border-slate-700 text-slate-400' : 'bg-white/95 border-gray-200 text-gray-500'} backdrop-blur-md border-t flex justify-around items-center px-1 z-50 text-[10px] font-bold`}>
               <button onClick={() => { setActiveTab('home'); setSelectedCategory(null); setSelectedShop(null); setIsPaymentScreen(false); setActiveTrackingOrder(null); }} className={`flex flex-col items-center gap-0.5 transition ${activeTab === 'home' ? 'text-[#fc8019] scale-105' : 'hover:text-white'}`}>
                 <ShoppingBag size={18} /><span>Home</span>
