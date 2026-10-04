@@ -5,7 +5,8 @@ import axios from "axios";
 import { Send, Image as ImageIcon, Paperclip, X, ShieldCheck } from "lucide-react";
 
 // ✅ Localhost Base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://Foodiee-backend-env.eba-5d9p6wzb.eu-north-1.elasticbeanstalk.com";
+// పాతది తీసేసి ఇది పెట్టండి:
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.foodiee.shop";
 
 export default function CustomerSupportChat({ customerMobile, customerName, onClose }) {
   const [messages, setMessages] = useState([]);

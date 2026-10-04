@@ -11,7 +11,7 @@ import OrderChatModal from './components/OrderChatModal';
 import logo from './assets/logo.png'; 
 
 // ✅ BASE URL UPDATE (AWS)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://Foodiee-backend-env.eba-5d9p6wzb.eu-north-1.elasticbeanstalk.com";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.foodiee.shop";
 
 // --- CUSTOM ANIMATED BIKE ICON FOR LEAFLET MAP ---
 const getAnimatedBikeIcon = (rotationAngle) => {
