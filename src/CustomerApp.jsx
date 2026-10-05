@@ -1027,9 +1027,12 @@ export default function CustomerApp() {
 
   const dynamicShops = allShops
     .filter(shop => {
-      const shopCat = (shop.category || '').toUpperCase();
+      // 1. షాప్ కేటగిరీని ఏ ఫీల్డ్ లో ఉన్నా తీసుకోవడం
+      const rawCat = shop.category || shop.shopCategory || shop.type || '';
+      const shopCat = rawCat.toUpperCase();
       const targetCat = (selectedCategory || '').toUpperCase();
 
+      // సెర్చ్ క్వెరీ ఉంటే
       if (searchQuery && searchQuery.trim() !== '') {
         const query = searchQuery.toLowerCase();
         const shopNameMatch = (shop.shopName || shop.name || '').toLowerCase().includes(query);
@@ -1045,26 +1048,31 @@ export default function CustomerApp() {
         return shopNameMatch || shopCatMatch || itemMatch;
       }
 
-      if (!targetCat) return true;
+      // ఏ కేటగిరీ సెలెక్ట్ చేయకపోతే అన్ని షాపులు చూపించాలి
+      if (!targetCat || targetCat === 'ALL') return true;
 
-      if (targetCat === 'MEAT & FISH') {
-        return shopCat.includes('MEAT') || shopCat.includes('CHICKEN') || shopCat.includes('MUTTON') || shopCat.includes('FISH') || shopCat.includes('MEAT & FISH');
+      // కేటగిరీ వైజ్ ఫ్లెక్సిబుల్ ఫిల్టరింగ్
+      if (targetCat.includes('MEAT') || targetCat.includes('FISH')) {
+        return shopCat.includes('MEAT') || shopCat.includes('CHICKEN') || shopCat.includes('MUTTON') || shopCat.includes('FISH');
       }
-      if (targetCat === 'GROCERY') {
-        return shopCat.includes('GROCERY') || shopCat.includes('STORE') || (shop.name || '').toUpperCase().includes('GROCERY') || (shop.shopName || '').toUpperCase().includes('GROCERY');
+      if (targetCat.includes('GROCERY')) {
+        return shopCat.includes('GROCERY') || shopCat.includes('STORE') || shopCat.includes('SUPERMARKET') || (shop.shopName || shop.name || '').toUpperCase().includes('GROCERY');
       }
-      if (targetCat === 'FOOD') {
-        return shopCat.includes('FOOD') || shopCat.includes('TIFFIN') || shopCat.includes('MEAL') || shopCat.includes('FAST');
+      if (targetCat.includes('FOOD')) {
+        return shopCat.includes('FOOD') || shopCat.includes('TIFFIN') || shopCat.includes('MEAL') || shopCat.includes('HOTEL') || shopCat.includes('RESTAURANT') || !shopCat;
       }
-      return shopCat.includes(targetCat);
+      
+      return shopCat.includes(targetCat) || targetCat.includes(shopCat);
     })
     .filter(shop => {
-      if (quickFilter === 'Trending') return (shop.rating || 4.8) >= 4.8;
-      if (quickFilter === 'Fast Delivery') return true;
-      if (quickFilter === 'Top Rated') return (shop.rating || 4.8) >= 4.7;
+      // ఎమోజీలతో సహా సరిగ్గా చెక్ చేయడం
+      if (quickFilter.includes('Trending')) return (parseFloat(shop.rating) || 4.8) >= 4.8;
+      if (quickFilter.includes('Fast Delivery')) return true;
+      if (quickFilter.includes('Top Rated')) return (parseFloat(shop.rating) || 4.8) >= 4.7;
       return true;
     })
     .map(shop => {
+      // షాప్ ఐటమ్స్ మ్యాపింగ్
       const shopItems = backendFoodItems.filter(item =>
         String(item.restaurantId) === String(shop.id) || 
         String(item.shopId) === String(shop.id) || 
@@ -1085,7 +1093,7 @@ export default function CustomerApp() {
         additionalImages: shop.additionalImages || [],
         rating: shop.rating ? `${shop.rating} ⭐` : '4.8 ⭐',
         time: shop.deliveryTime || '15 mins',
-        category: shop.category || 'Food & Tiffins',
+        category: shop.category || shop.shopCategory || 'Store',
         address: shop.address || 'Main Road, Ichapuram',
         categories: categoriesMap,
         items: shopItems
