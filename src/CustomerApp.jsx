@@ -149,7 +149,20 @@ export default function CustomerApp() {
     { id: 2, title: '🛒 Free Delivery', desc: 'Free delivery on all grocery orders above ₹199 in Ichapuram.', time: '2 hrs ago', unread: true }
   ]);
 
+  // ✅ Native Notification Helper Function for WhatsApp-like lock screen alerts
+  const showNativeNotification = (title, bodyText) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title || "Foodiee Notification", {
+        body: bodyText || "You have a new update!",
+        icon: logo
+      });
+    }
+  };
+
   useEffect(() => {
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
     localStorage.setItem('foodiee_saved_scratch_cards', JSON.stringify(scratchCards));
   }, [scratchCards]);
 
@@ -196,21 +209,24 @@ export default function CustomerApp() {
     if (!userMob) return;
 
     const stompClient = new Client({
-  webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws-foodiee`),
-  reconnectDelay: 5000,
-  heartbeatIncoming: 4000,
-  heartbeatOutgoing: 4000,
-  onConnect: () => {
+      webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws-foodiee`),
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+      onConnect: () => {
         stompClient.subscribe(`/topic/chat/${userMob}`, (message) => {
           const incoming = JSON.parse(message.body);
           if (incoming.senderType !== 'customer') {
             setUnreadSupportCount(prev => prev + 1);
             toast.success(`💬 న్యూ మెసేజ్ వచ్చింది: ${incoming.senderName || 'Support'}`);
+            showNativeNotification("New Chat Message 💬", incoming.message || "You received a new message");
           }
         });
 
         stompClient.subscribe('/topic/broadcast/all', (message) => {
           const broadcastData = JSON.parse(message.body);
+          showNativeNotification(broadcastData.title || "📢 Special Alert", broadcastData.message || broadcastData.desc);
+          
           toast((t) => (
             <div className="space-y-2 p-1">
               <div className="flex items-center gap-2">
@@ -238,9 +254,13 @@ export default function CustomerApp() {
           ]);
         });
 
-       stompClient.subscribe('/topic/broadcast/customers', (message) => {
+        stompClient.subscribe('/topic/broadcast/customers', (message) => {
           const broadcastData = JSON.parse(message.body);
           
+          const alertTitle = broadcastData.title || "🎉 Foodiee Special Offer";
+          const alertDesc = broadcastData.message || broadcastData.desc || "New offer available!";
+          showNativeNotification(alertTitle, alertDesc);
+
           toast((t) => (
             <div className="space-y-2.5 p-2 text-center">
               <div className="flex items-center justify-center gap-1.5">
@@ -248,12 +268,10 @@ export default function CustomerApp() {
                 <p className="font-black text-amber-400 text-xs uppercase tracking-wider">Customer Special Alert</p>
               </div>
 
-              {/* ✅ Message Text Display Fix */}
               <p className="text-xs text-white font-bold leading-relaxed">
                 {broadcastData.message || broadcastData.desc || broadcastData.title || "Special offers available now!"}
               </p>
               
-              {/* ✅ Image URL & Display Fix */}
               {broadcastData.imageUrl && (
                 <div className="w-full h-36 rounded-2xl overflow-hidden border border-slate-700 shadow-xl bg-slate-950 mt-1">
                   <img 
@@ -261,7 +279,7 @@ export default function CustomerApp() {
                     alt="Offer Banner" 
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.target.style.display = 'none'; // ఇమేజ్ లోడ్ అవ్వకపోతే ఎర్రర్ రాకుండా హైడ్ చేస్తుంది
+                      e.target.style.display = 'none';
                     }} 
                   />
                 </div>
@@ -279,7 +297,6 @@ export default function CustomerApp() {
             }
           });
 
-          // ✅ Notifications List లో సేవ్ అయ్యే లాజిక్ (ఒకటి కూడా మిస్ కాకుండా)
           setNotifications(prev => [
             {
               id: Date.now(),
@@ -410,11 +427,11 @@ export default function CustomerApp() {
     if (!activeTrackingOrder) return;
 
     const stompClient = new Client({
-   webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws-foodiee`),
-         reconnectDelay: 5000,
-         heartbeatIncoming: 4000,
-        heartbeatOutgoing: 4000,
-    onConnect: () => {
+      webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws-foodiee`),
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+      onConnect: () => {
         stompClient.subscribe(`/topic/location/${activeTrackingOrder.id || activeTrackingOrder.orderId}`, (message) => {
           const locationData = JSON.parse(message.body);
           const lat = locationData.lat !== undefined ? locationData.lat : locationData.latitude;
@@ -436,6 +453,7 @@ export default function CustomerApp() {
           if (chatData.senderType !== 'customer') {
             setUnreadOrderCount(prev => prev + 1);
             toast.success(`💬 న్యూ ఆర్డర్ మెసేజ్ వచ్చింది!`);
+            showNativeNotification("Order Message 💬", chatData.message || "New message from delivery/shop");
           }
         });
 
@@ -443,6 +461,7 @@ export default function CustomerApp() {
           const newStatus = message.body;
           setActiveTrackingOrder(prev => ({ ...prev, status: newStatus }));
           toast.success(`📦 Order Status Updated: ${newStatus}`);
+          showNativeNotification("Order Status Update 📦", `Your order status changed to: ${newStatus}`);
         });
       },
     });
@@ -491,8 +510,9 @@ export default function CustomerApp() {
     }
   };
 
+  // ✅ Requirement 1: Scratch & Earn reward strictly below ₹20 (Max reward ~19)
   const triggerScratchCard = (orderAmount) => {
-    const rewardAmount = Math.floor(2 + Math.random() * 23);
+    const rewardAmount = Math.floor(2 + Math.random() * 16);
     const timestamp = new Date().toLocaleString();
 
     const newCard = {
@@ -561,9 +581,13 @@ export default function CustomerApp() {
     return saved !== null ? JSON.parse(saved) : [];
   });
 
+  // ✅ Requirement 2: Ensure customer login name persists correctly in their profile
   const [address, setAddress] = useState(() => {
     const savedActive = localStorage.getItem('foodiee_active_address');
-    if (savedActive !== null) return JSON.parse(savedActive);
+    if (savedActive !== null) {
+      const parsed = JSON.parse(savedActive);
+      return { ...parsed, name: parsed.name || localStorage.getItem('userName') || '' };
+    }
     return savedAddresses[0] || {
       name: localStorage.getItem('userName') || '',
       mobile: localStorage.getItem('userMobile') || '',
@@ -822,7 +846,7 @@ export default function CustomerApp() {
 
   const applyPromo = () => {
     if (!promoCode.trim()) {
-      setDiscount(0); // ✅ కూపన్ కోడ్ ఇవ్వకపోతే డిస్కౌంట్ జీరో ఉండాలి
+      setDiscount(0);
       return;
     }
 
@@ -833,7 +857,6 @@ export default function CustomerApp() {
       return;
     }
 
-    // డేటాబేస్ లేదా availablePromos నుండి ఆ కూపన్‌కి సంబంధించిన ఒరిజినల్ డిస్కౌంట్ అమౌంట్ తీసుకోవడం
     const matched = availablePromos.find(p => p.code.toUpperCase() === promoCode.toUpperCase());
     
     if (matched) {
@@ -849,7 +872,6 @@ export default function CustomerApp() {
       setDiscount(numericDiscount);
       toast.success(`🎁 Promo code ${matched.code} applied successfully!`);
     } else {
-      // ✅ మ్యాచ్ అయ్యే కూపన్ లేకపోతే ఎలాంటి డిస్కౌంట్ వర్తించకూడదు (0)
       setDiscount(0);
       toast.error('❌ Invalid Promo Code');
     }
@@ -890,7 +912,7 @@ export default function CustomerApp() {
       if (response.ok) {
         const savedOrder = await response.json();
 
-       if (discount > 0 && promoCode) {
+        if (discount > 0 && promoCode) {
           const userMob = address.mobile || phone || localStorage.getItem('userMobile');
           const usedPromos = JSON.parse(localStorage.getItem(`foodiee_used_promos_${userMob}`) || '[]');
           if (!usedPromos.includes(promoCode.toUpperCase())) {
@@ -1027,12 +1049,10 @@ export default function CustomerApp() {
 
   const dynamicShops = allShops
     .filter(shop => {
-      // 1. షాప్ కేటగిరీని ఏ ఫీల్డ్ లో ఉన్నా తీసుకోవడం
       const rawCat = shop.category || shop.shopCategory || shop.type || '';
       const shopCat = rawCat.toUpperCase();
       const targetCat = (selectedCategory || '').toUpperCase();
 
-      // సెర్చ్ క్వెరీ ఉంటే
       if (searchQuery && searchQuery.trim() !== '') {
         const query = searchQuery.toLowerCase();
         const shopNameMatch = (shop.shopName || shop.name || '').toLowerCase().includes(query);
@@ -1048,10 +1068,8 @@ export default function CustomerApp() {
         return shopNameMatch || shopCatMatch || itemMatch;
       }
 
-      // ఏ కేటగిరీ సెలెక్ట్ చేయకపోతే అన్ని షాపులు చూపించాలి
       if (!targetCat || targetCat === 'ALL') return true;
 
-      // కేటగిరీ వైజ్ ఫ్లెక్సిబుల్ ఫిల్టరింగ్
       if (targetCat.includes('MEAT') || targetCat.includes('FISH')) {
         return shopCat.includes('MEAT') || shopCat.includes('CHICKEN') || shopCat.includes('MUTTON') || shopCat.includes('FISH');
       }
@@ -1065,14 +1083,12 @@ export default function CustomerApp() {
       return shopCat.includes(targetCat) || targetCat.includes(shopCat);
     })
     .filter(shop => {
-      // ఎమోజీలతో సహా సరిగ్గా చెక్ చేయడం
       if (quickFilter.includes('Trending')) return (parseFloat(shop.rating) || 4.8) >= 4.8;
       if (quickFilter.includes('Fast Delivery')) return true;
       if (quickFilter.includes('Top Rated')) return (parseFloat(shop.rating) || 4.8) >= 4.7;
       return true;
     })
     .map(shop => {
-      // షాప్ ఐటమ్స్ మ్యాపింగ్
       const shopItems = backendFoodItems.filter(item =>
         String(item.restaurantId) === String(shop.id) || 
         String(item.shopId) === String(shop.id) || 
@@ -1377,6 +1393,7 @@ export default function CustomerApp() {
                       const fetchedName = data.name && data.name.trim() !== '' ? data.name : 'User';
                       localStorage.setItem('userMobile', data.mobile || phone);
                       localStorage.setItem('userName', fetchedName);
+                      setAddress(prev => ({ ...prev, name: fetchedName }));
                       
                       const previousBalance = data.walletBalance !== undefined ? parseFloat(data.walletBalance) : 0.00;
                       localStorage.setItem('foodiee_wallet_balance', previousBalance);
@@ -2411,7 +2428,7 @@ export default function CustomerApp() {
                 <div className="space-y-4 text-xs animate-fadeIn pb-12">
                   <div className="flex justify-between items-center">
                     <h3 className="font-black text-gray-400 uppercase tracking-wider text-[11px]">* Offers & Rewards Hub</h3>
-                    <span className="text-[10px] text-amber-400 font-bold">Scratch & Earn (&lt; ₹25)</span>
+                    <span className="text-[10px] text-amber-400 font-bold">Scratch & Earn</span>
                   </div>
 
                   <div className="space-y-3">
@@ -2676,7 +2693,7 @@ export default function CustomerApp() {
                                   }} 
                                   className="w-9 h-9 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-700 flex items-center justify-center text-sm shadow transition hover:scale-110 cursor-pointer"
                                 >
-                                  {favorites.some(f => f.id === shop.id) ? '❤️' : '🤍'}
+                                  {favorites.some(f => f.id === shop.id) ? '❤️️' : '🤍'}
                                 </button>
                               </div>
 
