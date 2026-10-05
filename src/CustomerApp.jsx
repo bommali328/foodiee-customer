@@ -195,10 +195,12 @@ export default function CustomerApp() {
     const userMob = phone || localStorage.getItem('userMobile');
     if (!userMob) return;
 
-    const socket = new SockJS(`${API_BASE_URL}/ws-foodiee`);
     const stompClient = new Client({
-      webSocketFactory: () => socket,
-      onConnect: () => {
+  webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws-foodiee`),
+  reconnectDelay: 5000,
+  heartbeatIncoming: 4000,
+  heartbeatOutgoing: 4000,
+  onConnect: () => {
         stompClient.subscribe(`/topic/chat/${userMob}`, (message) => {
           const incoming = JSON.parse(message.body);
           if (incoming.senderType !== 'customer') {
@@ -407,10 +409,12 @@ export default function CustomerApp() {
   useEffect(() => {
     if (!activeTrackingOrder) return;
 
-    const socket = new SockJS(`${API_BASE_URL}/ws-foodiee`);
     const stompClient = new Client({
-      webSocketFactory: () => socket,
-      onConnect: () => {
+   webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws-foodiee`),
+         reconnectDelay: 5000,
+         heartbeatIncoming: 4000,
+        heartbeatOutgoing: 4000,
+    onConnect: () => {
         stompClient.subscribe(`/topic/location/${activeTrackingOrder.id || activeTrackingOrder.orderId}`, (message) => {
           const locationData = JSON.parse(message.body);
           const lat = locationData.lat !== undefined ? locationData.lat : locationData.latitude;
