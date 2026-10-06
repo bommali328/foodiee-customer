@@ -96,6 +96,7 @@ export default function CustomerApp() {
   });
   
   const [authMode, setAuthMode] = useState('login');
+  const [enteredPin, setEnteredPin] = useState('');
   const [showNotificationModal, setShowNotificationModal] = useState(false);
 
   const [unreadSupportCount, setUnreadSupportCount] = useState(0); 
@@ -1583,72 +1584,135 @@ export default function CustomerApp() {
                 </form>
               )}
 
-              {authMode === 'forgot' && (
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  const pwdRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{6,}$/;
-                  if (!pwdRegex.test(newPassword)) {
-                    toast.error('❌ Password must be at least 6 characters long and contain letters, numbers, and special characters!');
-                    return;
-                  }
+            
+            {authMode === 'forgot' && (
+  <form onSubmit={async (e) => {
+    e.preventDefault();
+    
+    // Step 2: Final submit to reset password with 4-digit PIN and new password
+    const pwdRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!\%*#?&]{6,}$/;
+    if (!pwdRegex.test(newPassword)) {
+      toast.error('❌ Password must be at least 6 characters long and contain letters, numbers, and special characters!');
+      return;
+    }
 
-                  try {
-                    const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ mobile: phone, newPassword, role: 'customer' })
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      toast.success('✓ Password updated successfully in database!');
-                      setAuthMode('login');
-                    } else {
-                      toast.error(data.error || 'Failed to reset password');
-                    }
-                  } catch (err) {
-                    toast.error('❌ Network error during password reset');
-                  }
-                }} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Registered Mobile Number</label>
-                    <input 
-                      type="tel" 
-                      maxLength="10" 
-                      value={phone} 
-                      onChange={(e) => setPhone(e.target.value)} 
-                      placeholder="10-digit mobile number" 
-                      className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3.5 rounded-2xl text-xs font-bold text-white outline-none" 
-                      required 
-                    />
-                  </div>
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          mobile: phone, 
+          otp: enteredPin, // 4-digit PIN
+          newPassword: newPassword, 
+          role: 'customer' 
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('✓ Password updated successfully!');
+        setAuthMode('login');
+        setEnteredPin('');
+        setNewPassword('');
+      } else {
+        toast.error(data.error || 'Failed to reset password');
+      }
+    } catch (err) {
+      toast.error('❌ Network error during password reset');
+    }
+  }} className="space-y-4">
+    
+    {/* Box 1: Registered Mobile Number */}
+    <div className="space-y-1">
+      <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">1. Registered Mobile Number</label>
+      <input 
+        type="tel" 
+        maxLength="10" 
+        value={phone} 
+        onChange={(e) => setPhone(e.target.value)} 
+        placeholder="10-digit mobile number" 
+        className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-xs font-bold text-white outline-none" 
+        required 
+      />
+    </div>
 
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">New Password (Min 6, Letters, Numbers, Special)</label>
-                    <input 
-                      type="password" 
-                      value={newPassword} 
-                      onChange={(e) => setNewPassword(e.target.value)} 
-                      placeholder="e.g. NewPass@123" 
-                      className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3.5 rounded-2xl text-xs font-bold text-white outline-none" 
-                      required 
-                    />
-                  </div>
+    {/* Box 2: Send OTP / Enter Button to trigger WhatsApp PIN */}
+    <div>
+      <button 
+        type="button" 
+        onClick={async () => {
+          if (!phone || phone.length !== 10) {
+            toast.error('❌ Please enter a valid 10-digit mobile number first');
+            return;
+          }
+          try {
+            const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mobile: phone, role: 'customer' })
+            });
+            const data = await res.json();
+            if (res.ok) {
+              toast.success('✓ 4-digit PIN sent to WhatsApp!');
+              if (data.whatsappRedirectUrl) {
+                window.open(data.whatsappRedirectUrl, '_blank');
+              }
+            } else {
+              toast.error(data.error || 'Mobile number not found');
+            }
+          } catch (err) {
+            toast.error('❌ Network error while sending PIN');
+          }
+        }}
+        className="w-full bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 py-2.5 rounded-xl font-black text-xs shadow cursor-pointer transition"
+      >
+        2. Send OTP / Get WhatsApp PIN 💬
+      </button>
+    </div>
 
-                  <button 
-                    type="submit" 
-                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 py-4 rounded-2xl font-black text-xs shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <span>Update Password</span>
-                    <ShieldCheck size={16} />
-                  </button>
+    {/* Box 3: Enter 4-Digit PIN */}
+    <div className="space-y-1">
+      <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">3. Enter 4-Digit PIN</label>
+      <input 
+        type="text" 
+        maxLength="4" 
+        value={enteredPin || ''} 
+        onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, ''))} 
+        placeholder="1234" 
+        className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-center text-base font-black text-amber-400 tracking-[0.4em] outline-none" 
+        required 
+      />
+    </div>
 
-                  <div className="text-center pt-1">
-                    <span onClick={() => setAuthMode('login')} className="text-[11px] text-slate-400 underline cursor-pointer font-bold hover:text-white">
-                      Back to Login
-                    </span>
-                  </div>
-                </form>
-              )}
+    {/* Box 4: New Password */}
+    <div className="space-y-1">
+      <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">4. New Password</label>
+      <input 
+        type="password" 
+        value={newPassword} 
+        onChange={(e) => setNewPassword(e.target.value)} 
+        placeholder="e.g. NewPass@123" 
+        className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-xs font-bold text-white outline-none" 
+        required 
+      />
+    </div>
+
+    {/* Box 5: Submit / Update Password Button */}
+    <button 
+      type="submit" 
+      className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 py-3.5 rounded-2xl font-black text-xs shadow-xl cursor-pointer"
+    >
+      5. Submit & Update Password 🔒
+    </button>
+
+    <div className="text-center pt-1">
+      <span onClick={() => setAuthMode('login')} className="text-[11px] text-slate-400 underline cursor-pointer font-bold hover:text-white">
+        Back to Login
+      </span>
+    </div>
+  </form>
+)}
+
+
             </div>
           </div>
         ) : (
