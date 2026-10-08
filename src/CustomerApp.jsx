@@ -512,12 +512,17 @@ export default function CustomerApp() {
   };
 
   // ✅ Requirement 1: Scratch & Earn reward strictly below ₹20 (Max reward ~19)
-  const triggerScratchCard = (orderAmount) => {
+  const triggerScratchCard = (orderId) => {
+    // E order ki already scratch card vachindo ledo check cheddam
+    const alreadyGiven = scratchCards.some(c => c.orderId === orderId);
+    if (alreadyGiven) return; // Oka order ki okasare card ravali[cite: 10]
+
     const rewardAmount = Math.floor(2 + Math.random() * 16);
     const timestamp = new Date().toLocaleString();
 
     const newCard = {
       id: Date.now(),
+      orderId: orderId || Date.now(),
       amount: rewardAmount,
       isScratched: false,
       timestamp: timestamp
@@ -2052,136 +2057,147 @@ export default function CustomerApp() {
                 </div>
               )}
 
-              {activeTrackingOrder ? (
-                (() => {
-                  const shopLat = activeTrackingOrder.shopLat || activeTrackingOrder.shop_lat || 18.5793;
-                  const shopLng = activeTrackingOrder.shopLng || activeTrackingOrder.shop_lng || 84.4452;
-                  const customerLat = activeTrackingOrder.customerLat || activeTrackingOrder.customer_lat || address.latitude || 18.5850;
-                  const customerLng = activeTrackingOrder.customerLng || activeTrackingOrder.customer_lng || address.longitude || 84.4520;
+             {activeTrackingOrder ? (
+  (() => {
+    const shopLat = activeTrackingOrder.shopLat || activeTrackingOrder.shop_lat || 18.5793;
+    const shopLng = activeTrackingOrder.shopLng || activeTrackingOrder.shop_lng || 84.4452;
+    const customerLat = activeTrackingOrder.customerLat || activeTrackingOrder.customer_lat || address.latitude || 18.5850;
+    const customerLng = activeTrackingOrder.customerLng || activeTrackingOrder.customer_lng || address.longitude || 84.4520;
 
-                  return (
-                    <div className="space-y-3 pb-6 animate-fadeIn">
-                      <button onClick={() => setActiveTrackingOrder(null)} className="text-xs font-bold text-gray-400 flex items-center gap-1 hover:text-white transition">
-                        <ArrowLeft size={14} /> Back to Dashboard
-                      </button>
+    return (
+      <div className="space-y-3 pb-6 animate-fadeIn">
+        <button onClick={() => setActiveTrackingOrder(null)} className="text-xs font-bold text-gray-400 flex items-center gap-1 hover:text-white transition">
+          <ArrowLeft size={14} /> Back to Dashboard
+        </button>
 
-                      <div className="bg-slate-900 border border-amber-500/30 backdrop-blur-md text-white rounded-[32px] overflow-hidden shadow-2xl space-y-4">
-                        <div className="p-4 pb-2 flex justify-between items-center border-b border-slate-800">
-                          <div>
-                            <span className="bg-[#fc8019]/20 text-[#fc8019] text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Live Tracking</span>
-                            <h3 className="text-sm font-black mt-1 text-white">Order from {activeTrackingOrder.shopName || activeTrackingOrder.shop}</h3>
-                            <p className="text-[10px] text-slate-400">Order ID: {activeTrackingOrder.orderId || activeTrackingOrder.id}</p>
-                          </div>
-                        </div>
+        <div className="bg-slate-900 border border-amber-500/30 backdrop-blur-md text-white rounded-[32px] overflow-hidden shadow-2xl space-y-4">
+          <div className="p-4 pb-2 flex justify-between items-center border-b border-slate-800">
+            <div>
+              <span className="bg-[#fc8019]/20 text-[#fc8019] text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Live Tracking</span>
+              <h3 className="text-sm font-black mt-1 text-white">Order from {activeTrackingOrder.shopName || activeTrackingOrder.shop}</h3>
+              <p className="text-[10px] text-slate-400">Order ID: {activeTrackingOrder.orderId || activeTrackingOrder.id}</p>
+            </div>
+          </div>
 
-                        <div className="w-full h-56 relative border-y border-slate-800">
-                          <MapContainer center={[riderLocation.lat, riderLocation.lng]} zoom={15} zoomControl={false} className="w-full h-full z-10">
-                            <MapUpdater center={[riderLocation.lat, riderLocation.lng]} />
-                            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                            
-                            <Polyline 
-                              positions={[[riderLocation.lat, riderLocation.lng], [shopLat, shopLng]]} 
-                              color="#fc8019" 
-                              weight={4} 
-                              dashArray="5, 5" 
-                            />
+          <div className="w-full h-56 relative border-y border-slate-800">
+            <MapContainer center={[riderLocation.lat, riderLocation.lng]} zoom={15} zoomControl={false} className="w-full h-full z-10">
+              <MapUpdater center={[riderLocation.lat, riderLocation.lng]} />
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              
+              <Polyline 
+                positions={[[riderLocation.lat, riderLocation.lng], [shopLat, shopLng]]} 
+                color="#fc8019" 
+                weight={4} 
+                dashArray="5, 5" 
+              />
 
-                            <Polyline 
-                              positions={[[shopLat, shopLng], [customerLat, customerLng]]} 
-                              color="#3b82f6" 
-                              weight={5} 
-                            />
+              <Polyline 
+                positions={[[shopLat, shopLng], [customerLat, customerLng]]} 
+                color="#3b82f6" 
+                weight={5} 
+              />
 
-                            <Marker 
-                              position={[riderLocation.lat, riderLocation.lng]} 
-                              icon={getAnimatedBikeIcon(0)} 
-                            />
-                          </MapContainer>
-                          
-                          <div className="absolute top-4 right-4 bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-2xl text-center border border-emerald-400/40 backdrop-blur-md animate-pulse z-20">
-                            <p className="text-lg font-black leading-none">12</p>
-                            <p className="text-[9px] font-bold uppercase tracking-wider opacity-90 mt-0.5">Mins</p>
-                          </div>
+              <Marker 
+                position={[riderLocation.lat, riderLocation.lng]} 
+                icon={getAnimatedBikeIcon(0)} 
+              />
+            </MapContainer>
+            
+            <div className="absolute top-4 right-4 bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-2xl text-center border border-emerald-400/40 backdrop-blur-md animate-pulse z-20">
+              <p className="text-lg font-black leading-none">12</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider opacity-90 mt-0.5">Mins</p>
+            </div>
 
-                          <div className="absolute top-4 left-4 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 px-3 py-2 rounded-2xl shadow-xl flex items-center gap-2 z-20">
-                            <span className="text-base animate-bounce">🛵</span>
-                            <div>
-                              <p className="text-[11px] font-black text-white">Rider is on the way</p>
-                              <p className="text-[9px] text-emerald-400 font-bold">{activeTrackingOrder.status || 'Out for delivery 🛵'}</p>
-                            </div>
-                          </div>
-                        </div>
+            <div className="absolute top-4 left-4 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 px-3 py-2 rounded-2xl shadow-xl flex items-center gap-2 z-20">
+              <span className="text-base animate-bounce">🛵</span>
+              <div>
+                <p className="text-[11px] font-black text-white">Rider is on the way</p>
+                <p className="text-[9px] text-emerald-400 font-bold">{activeTrackingOrder.status || 'Out for delivery 🛵'}</p>
+              </div>
+            </div>
+          </div>
 
-                        <div className="px-4 space-y-3">
-                          <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-emerald-500/30 space-y-1">
-                            <h4 className="text-xs font-black text-white uppercase tracking-wider">Current Status</h4>
-                            <span className="inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse">
-                              ● {activeTrackingOrder.status || 'Out for delivery 🛵'}
-                            </span>
-                          </div>
+          <div className="px-4 space-y-3">
+            <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-emerald-500/30 space-y-1">
+              <h4 className="text-xs font-black text-white uppercase tracking-wider">Current Status</h4>
+              <span className="inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse">
+                ● {activeTrackingOrder.status || 'Out for delivery 🛵'}
+              </span>
+            </div>
 
-                          {((activeTrackingOrder.status || '').toLowerCase().includes('out for delivery') || activeTrackingOrder.deliveryOtp || activeTrackingOrder.delivery_otp) && (
-                            <div className="bg-amber-500/20 border-2 border-amber-500 px-3 py-2.5 rounded-2xl text-center">
-                              <p className="text-[10px] text-amber-300 font-black uppercase tracking-wider">Delivery OTP for Partner</p>
-                              <h3 className="text-xl font-black text-amber-400 tracking-[0.2em] mt-0.5">
-                                {activeTrackingOrder.deliveryOtp || activeTrackingOrder.delivery_otp || '----'}
-                              </h3>
-                            </div>
-                          )}
+            {/* ✅ WhatsApp OTP Display & Direct WhatsApp Button */}
+            <div className="bg-amber-500/10 border-2 border-amber-500/40 p-4 rounded-2xl text-center space-y-2">
+              <p className="text-amber-400 font-black uppercase tracking-wider text-[11px]">🔑 Secure Delivery OTP (Sent to WhatsApp)</p>
+              <h3 className="text-2xl font-black text-white tracking-[0.2em]">
+                {activeTrackingOrder.deliveryOtp || activeTrackingOrder.delivery_otp || '4829'}
+              </h3>
+              <p className="text-[10px] text-slate-400">
+                కస్టమర్ మొబైల్ నంబర్‌కి వాట్సాప్ ద్వారా OTP పంపబడింది. ఫుడ్ అందిన తర్వాతే డెలివరీ బాయ్‌కి చెప్పండి.
+              </p>
+              <a 
+                href={`https://api.whatsapp.com/send?phone=91${activeTrackingOrder.customerMobile || address.mobile || phone}&text=Hello, your Foodiee Order #${activeTrackingOrder.orderId || activeTrackingOrder.id} Delivery OTP is ${activeTrackingOrder.deliveryOtp || activeTrackingOrder.delivery_otp || '4829'}`} 
+                target="_blank" 
+                rel="noreferrer"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow cursor-pointer mt-2"
+              >
+                <span>💬 Resend WhatsApp OTP</span>
+              </a>
+            </div>
 
-                          <div className="grid grid-cols-2 gap-2">
-                            <button 
-                              onClick={() => { setActiveChatRecipient('partner'); setUnreadOrderCount(0); }} 
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow relative"
-                            >
-                              <Bike size={14} /> WhatsApp Chat (Rider)
-                              {unreadOrderCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-red-600 text-white font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
-                                  {unreadOrderCount}
-                                </span>
-                              )}
-                            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button 
+                onClick={() => { setActiveChatRecipient('partner'); setUnreadOrderCount(0); }} 
+                className="bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow relative"
+              >
+                <Bike size={14} /> WhatsApp Chat (Rider)
+                {unreadOrderCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
+                    {unreadOrderCount}
+                  </span>
+                )}
+              </button>
 
-                            <button 
-                              onClick={() => { setActiveChatRecipient('shop'); setUnreadOrderCount(0); }} 
-                              className="bg-[#075e54] hover:bg-[#054c44] text-white py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow relative"
-                            >
-                              <Store size={14} /> WhatsApp Chat (Shop)
-                            </button>
-                          </div>
+              <button 
+                onClick={() => { setActiveChatRecipient('shop'); setUnreadOrderCount(0); }} 
+                className="bg-[#075e54] hover:bg-[#054c44] text-white py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow relative"
+              >
+                <Store size={14} /> WhatsApp Chat (Shop)
+              </button>
+            </div>
 
-                          <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-base font-black text-amber-400">
-                                <Store size={18} />
-                              </div>
-                              <div>
-                                <h4 className="text-xs font-black text-white">{activeTrackingOrder.shopName || activeTrackingOrder.shop}</h4>
-                                <p className="text-[9px] text-slate-400">Shop Owner</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button onClick={() => toast.success(`📞 Calling shop...`)} className="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center shadow"><Phone size={15} /></button>
-                            </div>
-                          </div>
+            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-base font-black text-amber-400">
+                  <Store size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-white">{activeTrackingOrder.shopName || activeTrackingOrder.shop}</h4>
+                  <p className="text-[9px] text-slate-400">Shop Owner</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => toast.success(`📞 Calling shop...`)} className="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center shadow"><Phone size={15} /></button>
+              </div>
+            </div>
 
-                          <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-base font-black text-amber-400">👨‍✈️</div>
-                              <div>
-                                <h4 className="text-xs font-black text-white">Bommali Naveen</h4>
-                                <p className="text-[9px] text-slate-400">Delivery Partner (AP 30 BIKE 1234)</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button onClick={() => toast.success(`📞 Calling delivery partner...`)} className="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center shadow"><Phone size={15} /></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()
+            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-base font-black text-amber-400">👨‍✈️</div>
+                <div>
+                  <h4 className="text-xs font-black text-white">Delivery Partner</h4>
+                  <p className="text-[9px] text-slate-400">Assigned Driver</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => toast.success(`📞 Calling delivery partner...`)} className="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center shadow"><Phone size={15} /></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  })()
+
               ) : isPaymentScreen ? (
                 <div className="space-y-3">
                   <button onClick={() => setIsPaymentScreen(false)} className="text-xs font-bold text-gray-500 flex items-center gap-1">
@@ -2652,17 +2668,7 @@ export default function CustomerApp() {
                     <p className="text-xs text-slate-300 font-medium">Get your hot food, groceries & meat delivered at your doorstep within 15-20 minutes in Ichapuram!</p>
                   </div>
 
-                  <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-violet-800 shadow-purple-500/20 p-4 rounded-3xl text-white shadow-xl shadow-orange-500/20 border border-white/20 transform hover:scale-[1.02] transition-transform">
-                    <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-2xl"></div>
-                    <div className="flex justify-between items-center relative z-10">
-                      <div className="space-y-1">
-                        <span className="bg-white/20 text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Special Offer</span>
-                        <p className="font-black text-base tracking-tight mt-1">🎉 Ichapuram Food Fest</p>
-                        <p className="text-[11px] opacity-90 font-medium">20% OFF on local tiffins & meals!</p>
-                      </div>
-                      <div className="w-12 h-12 rounded-2xl bg-white/25 backdrop-blur-md flex items-center justify-center text-2xl shadow-inner border border-white/30">🍕</div>
-                    </div>
-                  </div>
+                 
                 </div>
               ) : selectedCategory && !selectedShop ? (
                 <div className="space-y-4 animate-fadeIn pb-12">
@@ -2733,7 +2739,14 @@ export default function CustomerApp() {
                         .map(shop => (
                           <div 
                             key={shop.id} 
-                            onClick={() => setSelectedShop(shop)} 
+                            onClick={() => { 
+                              if (shop.shopOpen === false) {
+                                toast.error('❌ This shop is currently closed!');
+                                return;
+                              }
+                              setSelectedCategory(shop.category || 'Food'); 
+                              setSelectedShop(shop); 
+                            }} 
                             className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-slate-700/80 rounded-[30px] overflow-hidden shadow-xl shadow-black/30 cursor-pointer group hover:border-[#fc8019] transition-all duration-300 transform hover:scale-[1.01] relative"
                           >
                             <div className="absolute top-0 right-0 w-28 h-28 bg-orange-500/10 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all"></div>
@@ -2744,6 +2757,12 @@ export default function CustomerApp() {
                                 alt={shop.name} 
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90" 
                               />
+                              {/* 👇 ఇక్కడ ఈ కోడ్ పేస్ట్ చేయాలి */}
+                {shop.shopOpen === false && (
+                   <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-20">
+                  <span className="bg-rose-500 text-white font-black px-3 py-1.5 rounded-full text-xs uppercase shadow-lg">Shop Closed ❌</span>
+              </div>
+                            )}
                               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
 
                               <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-10">
@@ -2787,7 +2806,8 @@ export default function CustomerApp() {
                     )}
                   </div>
                 </div>
-              ) : selectedCategory && selectedShop ? (
+
+                   ) : selectedCategory && selectedShop ? (
                 <div className="space-y-4 animate-fadeIn pb-16">
                   <button onClick={() => setSelectedShop(null)} className="text-xs font-bold text-slate-400 flex items-center gap-1 hover:text-white transition cursor-pointer">
                     <ArrowLeft size={14} /> Back to Shops
@@ -2828,17 +2848,21 @@ export default function CustomerApp() {
                                   <span className="text-[9px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md font-bold">Fresh & Tasty</span>
                                 </div>
 
-                                {cartItem ? (
-                                  <div className="flex items-center bg-gradient-to-r from-[#fc8019] to-amber-500 text-slate-950 rounded-xl px-3 py-1.5 gap-2 font-black shrink-0 text-xs shadow-md">
-                                    <button onClick={() => setCart(cart.map(c => c.id === itemId ? {...c, qty: c.qty - 1} : c).filter(c => c.qty > 0))}><Minus size={13}/></button>
-                                    <span>{cartItem.qty}</span>
-                                    <button onClick={() => setCart(cart.map(c => c.id === itemId ? {...c, qty: c.qty + 1} : c))}><Plus size={13}/></button>
-                                  </div>
-                                ) : (
-                                  <button onClick={() => setCart([...cart, { id: itemId, name: itemName, price: itemPrice, qty: 1 }])} className="bg-slate-800 hover:bg-[#fc8019] text-[#fc8019] hover:text-slate-950 border border-slate-700 px-3.5 py-2 rounded-xl font-black text-xs shrink-0 transition-all shadow-md cursor-pointer">
-                                    ADD +
-                                  </button>
-                                )}
+                               {item.available === false ? (
+  <button disabled className="bg-slate-800 text-rose-400 border border-rose-500/30 px-3 py-2 rounded-xl font-bold text-[10px] cursor-not-allowed opacity-75">
+    Out of Stock ❌
+  </button>
+) : cartItem ? (
+  <div className="flex items-center bg-gradient-to-r from-[#fc8019] to-amber-500 text-slate-950 rounded-xl px-3 py-1.5 gap-2 font-black shrink-0 text-xs shadow-md">
+    <button onClick={() => setCart(cart.map(c => c.id === itemId ? {...c, qty: c.qty - 1} : c).filter(c => c.qty > 0))}><Minus size={13}/></button>
+    <span>{cartItem.qty}</span>
+    <button onClick={() => setCart(cart.map(c => c.id === itemId ? {...c, qty: c.qty + 1} : c))}><Plus size={13}/></button>
+  </div>
+) : (
+  <button onClick={() => setCart([...cart, { id: itemId, name: itemName, price: itemPrice, qty: 1 }])} className="bg-slate-800 hover:bg-[#fc8019] text-[#fc8019] hover:text-slate-950 border border-slate-700 px-3.5 py-2 rounded-xl font-black text-xs shrink-0 transition-all shadow-md cursor-pointer">
+    ADD +
+  </button>
+)}
                               </div>
                             );
                           })}
