@@ -915,6 +915,11 @@ export default function CustomerApp() {
         body: JSON.stringify(newOrderPayload),
       });
 
+      if (response.status === 400) {
+        toast.error('❌ ఈ ప్రోమో కోడ్ మీరు ఇప్పటికే ఒకసారి వాడుకున్నారు!');
+        return;
+      }
+
       if (response.ok) {
         const savedOrder = await response.json();
 
