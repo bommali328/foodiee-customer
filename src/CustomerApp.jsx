@@ -10,6 +10,7 @@ import CustomerSupportChat from './components/CustomerSupportChat';
 import OrderChatModal from './components/OrderChatModal'; 
 import logo from './assets/logo.png'; 
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 
 // ✅ BASE URL UPDATE (AWS)
@@ -194,21 +195,23 @@ export default function CustomerApp() {
     localStorage.setItem('foodiee_saved_scratch_cards', JSON.stringify(scratchCards));
   }, [scratchCards, phone]);
 
+  
+
   useEffect(() => {
-    const requestNotificationPermission = async () => {
-      if ('Notification' in window) {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          console.log('Notification permission granted.');
+    const requestCapacitorNotifications = async () => {
+      try {
+        const permStatus = await LocalNotifications.requestPermissions();
+        if (permStatus.display === 'granted') {
+          console.log('Capacitor Notification permission granted!');
         } else {
-          console.log('Permission denied.');
+          console.log('Capacitor Notification permission denied.');
         }
+      } catch (e) {
+        console.log('Not running in Capacitor native environment or error:', e);
       }
     };
-
-    requestNotificationPermission();
+    requestCapacitorNotifications();
   }, []);
-
   // లొకేషన్ మరియు కెమెరా పర్మిషన్స్ అడగడానికి
   useEffect(() => {
     const requestDevicePermissions = async () => {
