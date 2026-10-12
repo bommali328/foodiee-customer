@@ -9,6 +9,8 @@ import 'leaflet/dist/leaflet.css';
 import CustomerSupportChat from './components/CustomerSupportChat';
 import OrderChatModal from './components/OrderChatModal'; 
 import logo from './assets/logo.png'; 
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
+
 
 // ✅ BASE URL UPDATE (AWS)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.foodiee.shop";
@@ -163,9 +165,34 @@ export default function CustomerApp() {
   useEffect(() => {
     if ("Notification" in window && Notification.permission !== "granted") {
       Notification.requestPermission();
+    } else if ("Notification" in window && Notification.permission === "granted") {
+      // 👇 ఇక్కడ FCM టోకెన్ తీసుకొని బ్యాక్‌ఎండ్‌కు పంపే కోడ్ పెట్టాలి
+      const sendToken = async () => {
+        try {
+          const userMob = phone || localStorage.getItem('userMobile');
+          if (!userMob) return;
+          
+          const token = await getToken(messaging, { 
+            vapidKey: 'BF-5htY4zliIE653UyTdHQ9Em8CbprK761jZb9_U60d1_dqh0FY25rOOEuG6Vy69jQdVI7kWVxMZPr4TipHzhhg' 
+          });
+
+          if (token) {
+            await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mobile: userMob, fcmToken: token })
+            });
+            console.log("FCM Token synced successfully!");
+          }
+        } catch (err) {
+          console.error("Token sync error:", err);
+        }
+      };
+      sendToken();
     }
+
     localStorage.setItem('foodiee_saved_scratch_cards', JSON.stringify(scratchCards));
-  }, [scratchCards]);
+  }, [scratchCards, phone]);
 
   useEffect(() => {
     const fetchActivePromos = async () => {
@@ -623,30 +650,43 @@ export default function CustomerApp() {
   });
 
   const detectGpsForNewAddress = () => {
-    if (navigator.geolocation) {
-      toast.loading('📍 Detecting live GPS location...');
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          setNewAddressInput(prev => ({
-            ...prev,
-            latitude: lat,
-            longitude: lng,
-            street: prev.street ? prev.street : `GPS Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`
-          }));
-          toast.dismiss();
-          toast.success('📍 GPS coordinates captured successfully!');
-        },
-        (error) => {
-          toast.dismiss();
-          toast.error('❌ GPS unavailable. Please enter complete address manually.');
-        },
-        { enableHighAccuracy: true }
-      );
-    } else {
-      toast.error('❌ Geolocation not supported');
+    if (!navigator.geolocation) {
+      toast.error('❌ Geolocation not supported by your browser');
+      return;
     }
+
+    toast.loading('📍 Detecting live GPS location & requesting permissions...');
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setNewAddressInput(prev => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+          street: prev.street ? prev.street : `GPS Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+        }));
+        toast.dismiss();
+        toast.success('📍 GPS coordinates captured successfully!');
+      },
+      (error) => {
+        toast.dismiss();
+        let errorMessage = '❌ GPS unavailable. Please enter complete address manually.';
+        
+        // Browser permission block ayithe specific ga message chupinchadaniki
+        if (error.code === error.PERMISSION_DENIED) {
+          errorMessage = '❌ Location permission denied! Please enable GPS permissions in your browser settings.';
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          errorMessage = '❌ Location information is unavailable.';
+        } else if (error.code === error.TIMEOUT) {
+          errorMessage = '❌ Location request timed out. Please try again.';
+        }
+        
+        toast.error(errorMessage, { duration: 5000 });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
   };
 
   const handleAddNewAddress = async (e) => {
@@ -1394,47 +1434,52 @@ export default function CustomerApp() {
                 <form onSubmit={async (e) => {
                   e.preventDefault();
                   try {
-                    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ mobile: phone, password, role: 'customer' })
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      const fetchedName = data.name && data.name.trim() !== '' ? data.name : 'User';
-                      localStorage.setItem('userMobile', data.mobile || phone);
-                      localStorage.setItem('userName', fetchedName);
-                      setAddress(prev => ({ ...prev, name: fetchedName }));
-                      
-                      const previousBalance = data.walletBalance !== undefined ? parseFloat(data.walletBalance) : 0.00;
-                      localStorage.setItem('foodiee_wallet_balance', previousBalance);
-                      setWalletBalance(previousBalance);
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile: phone, password, role: 'customer' })
+    });
+    const responseData = await res.json();
+    
+    if (res.ok) {
+        // 🌟 సర్వర్ నుండి వచ్చే రెస్పాన్స్ स्ट्रक्चर ప్రకారం యూజర్ డేటాను తీసుకోవడం
+        const userData = responseData.data || responseData;
 
-                      if (data.paymentHistory) {
-                        localStorage.setItem('foodiee_payment_history', JSON.stringify(data.paymentHistory));
-                        setPaymentHistory(data.paymentHistory);
-                      }
+        const fetchedName = userData.name && userData.name.trim() !== '' ? userData.name : 'User';
+        localStorage.setItem('userMobile', userData.mobile || phone);
+        localStorage.setItem('userName', fetchedName);
+        setAddress(prev => ({ ...prev, name: fetchedName }));
+        
+        // డేటాబేస్ నుండి వాలెట్ బ్యాలెన్స్ సరిగ్గా రీడ్ చేయడానికి
+        const previousBalance = userData.walletBalance !== undefined ? parseFloat(userData.walletBalance) : 0.00;
+        localStorage.setItem('foodiee_wallet_balance', previousBalance);
+        setWalletBalance(previousBalance);
 
-                      if (data.scratchCards) {
-                        localStorage.setItem('foodiee_saved_scratch_cards', JSON.stringify(data.scratchCards));
-                        setScratchCards(data.scratchCards);
-                      }
+        if (userData.paymentHistory) {
+            localStorage.setItem('foodiee_payment_history', JSON.stringify(userData.paymentHistory));
+            setPaymentHistory(userData.paymentHistory);
+        }
 
-                      const orderRes = await fetch(`${API_BASE_URL}/api/orders/customer/${data.mobile || phone}`);
-                      if (orderRes.ok) {
-                        const orderData = await orderRes.json();
-                        setBackendOrders(orderData);
-                      }
+        if (userData.scratchCards) {
+            localStorage.setItem('foodiee_saved_scratch_cards', JSON.stringify(userData.scratchCards));
+            setScratchCards(userData.scratchCards);
+        }
 
-                      setAddress(prev => ({ ...prev, name: fetchedName, mobile: data.mobile || phone }));
-                      setIsLoggedIn(true);
-                      toast.success(`🎉 Welcome back, ${fetchedName}!`);
-                    } else {
-                      toast.error(data.error || '❌ Mobile number and Password do not match! Cannot login.');
-                    }
-                  } catch (err) {
-                    toast.error('❌ Network error during login');
-                  }
+        const orderRes = await fetch(`${API_BASE_URL}/api/orders/customer/${userData.mobile || phone}`);
+        if (orderRes.ok) {
+            const orderData = await orderRes.json();
+            setBackendOrders(orderData);
+        }
+
+        setAddress(prev => ({ ...prev, name: fetchedName, mobile: userData.mobile || phone }));
+        setIsLoggedIn(true);
+        toast.success(`🎉 Welcome back, ${fetchedName}!`);
+    } else {
+        toast.error(responseData.error || '❌ Mobile number and Password do not match! Cannot login.');
+    }
+} catch (err) {
+    toast.error('❌ Network error during login');
+}
                 }} className="space-y-4">
                   <div className="space-y-1">
                     <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Mobile Number</label>
