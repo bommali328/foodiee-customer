@@ -195,6 +195,52 @@ export default function CustomerApp() {
   }, [scratchCards, phone]);
 
   useEffect(() => {
+    const requestNotificationPermission = async () => {
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          console.log('Notification permission granted.');
+        } else {
+          console.log('Permission denied.');
+        }
+      }
+    };
+
+    requestNotificationPermission();
+  }, []);
+
+  // లొకేషన్ మరియు కెమెరా పర్మిషన్స్ అడగడానికి
+  useEffect(() => {
+    const requestDevicePermissions = async () => {
+      // 1. Location Permission
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            console.log("Location permission granted:", position.coords.latitude, position.coords.longitude);
+          },
+          (error) => {
+            console.log("Location permission denied or error:", error.message);
+          }
+        );
+      }
+
+      // 2. Camera Permission
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          console.log("Camera permission granted.");
+          // పర్మిషన్ వచ్చాక స్ట్రీమ్ క్లోజ్ చేయడం
+          stream.getTracks().forEach(track => track.stop());
+        }
+      } catch (err) {
+        console.log("Camera permission denied or error:", err.message);
+      }
+    };
+
+    requestDevicePermissions();
+  }, []);
+
+  useEffect(() => {
     const fetchActivePromos = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/promos/active`);
