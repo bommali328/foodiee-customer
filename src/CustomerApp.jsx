@@ -11,7 +11,22 @@ import OrderChatModal from './components/OrderChatModal';
 import logo from './assets/logo.png'; 
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { initializeApp } from "firebase/app";
 
+
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBP_A2y0eWPDEIZoX1RV0sl4E30j9WzIZ0",
+  authDomain: "foodiee-c1d35.firebaseapp.com",
+  projectId: "foodiee-c1d35",
+  storageBucket: "foodiee-c1d35.firebasestorage.app",
+  messagingSenderId: "375959156815",
+  appId: "1:375959156815:web:e8f604c166a4e641a2923a",
+  measurementId: "G-CWXX3TDZVY"
+};
+
+const app = initializeApp(firebaseConfig);
+const messaging = getMessaging(app);
 
 // ✅ BASE URL UPDATE (AWS)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.foodiee.shop";
@@ -162,6 +177,27 @@ export default function CustomerApp() {
       });
     }
   };
+
+  const fetchFCMToken = async () => {
+    try {
+      const currentToken = await getToken(messaging, { 
+        vapidKey: 'BF-5htY4zliIE653UyTdHQ9Em8CbprK761jZb9_U60d1_dqh0FY25rOOEuG6Vy69jQdVI7kWVxMZPr4TipHzhhg' 
+      });
+      if (currentToken) {
+        console.log('Customer FCM Token:', currentToken);
+        // ఈ టోకెన్‌ని బ్యాక్‌ఎండ్‌కి పంపే లాజిక్ ఇక్కడ రాసుకోవచ్చు
+      } else {
+        console.log('No registration token available.');
+      }
+    } catch (err) {
+      console.log('An error occurred while retrieving token. ', err);
+    }
+  };
+
+  // యాప్ ఓపెన్ అయినప్పుడు దీన్ని కాల్ చేయడానికి useEffect లో పెట్టుకోండి
+  useEffect(() => {
+    fetchFCMToken();
+  }, []);
 
   useEffect(() => {
     if ("Notification" in window && Notification.permission !== "granted") {
