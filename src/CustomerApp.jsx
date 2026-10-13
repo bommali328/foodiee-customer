@@ -378,41 +378,7 @@ export default function CustomerApp() {
           const alertDesc = broadcastData.message || broadcastData.desc || "New offer available!";
           showNativeNotification(alertTitle, alertDesc);
 
-          toast((t) => (
-            <div className="space-y-2.5 p-2 text-center">
-              <div className="flex items-center justify-center gap-1.5">
-                <span className="text-lg">🎉</span>
-                <p className="font-black text-amber-400 text-xs uppercase tracking-wider">Customer Special Alert</p>
-              </div>
-
-              <p className="text-xs text-white font-bold leading-relaxed">
-                {broadcastData.message || broadcastData.desc || broadcastData.title || "Special offers available now!"}
-              </p>
-              
-              {broadcastData.imageUrl && (
-                <div className="w-full h-36 rounded-2xl overflow-hidden border border-slate-700 shadow-xl bg-slate-950 mt-1">
-                  <img 
-                    src={broadcastData.imageUrl.startsWith('http') ? broadcastData.imageUrl : `${API_BASE_URL}/${broadcastData.imageUrl.startsWith('/') ? broadcastData.imageUrl.slice(1) : broadcastData.imageUrl}`} 
-                    alt="Offer Banner" 
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }} 
-                  />
-                </div>
-              )}
-            </div>
-          ), { 
-            duration: 10000, 
-            position: 'top-center',
-            style: {
-              background: '#0f172a',
-              color: '#fff',
-              border: '2px solid rgba(245, 158, 11, 0.5)',
-              borderRadius: '24px',
-              padding: '12px'
-            }
-          });
+          
 
           setNotifications(prev => [
             {

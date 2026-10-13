@@ -1,5 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBP_A2y0eWPDEIZoX1RV0sl4E30j9WzIZ0",
@@ -11,13 +13,14 @@ const firebaseConfig = {
   measurementId: "G-CWXX3TDZVY"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const messaging = getMessaging(app);
 
-// 👇 1. టోకెన్‌ను బ్యాక్‌ఎండ్‌కు పంపే ఫంక్షన్ ఇక్కడ రాయండి
+// టోకెన్‌ను బ్యాక్‌ఎండ్‌కు పంపే ఫంక్షన్ (ప్రొడక్షన్ URL వాడటం మంచిది)
 const sendTokenToBackend = async (mobile, token) => {
   try {
-    await fetch('http://localhost:8080/api/customers/update-fcm-token', {
+    await fetch('https://api.foodiee.shop/api/customers/update-fcm-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mobile: mobile, fcmToken: token })
@@ -28,32 +31,55 @@ const sendTokenToBackend = async (mobile, token) => {
   }
 };
 
-// 👇 2. పర్మిషన్ అడిగి టోకెన్ తీసుకునే ఫంక్షన్
+// నోటిఫికేషన్ పర్మిషన్ మరియు టోకెన్ తెచ్చుకోవడం
 export const requestCustomerNotificationPermission = async (customerMobile) => {
   try {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      const token = await getToken(messaging, { 
-        vapidKey: 'BF-5htY4zliIE653UyTdHQ9Em8CbprK761jZb9_U60d1_dqh0FY25rOOEuG6Vy69jQdVI7kWVxMZPr4TipHzhhg' 
-      });
-      console.log('Customer FCM Token:', token);
+    // ఒకవేళ ఆండ్రాయిడ్ యాప్ (Capacitor) అయితే నేటివ్ పుష్ నోటిఫికేషన్స్ వాడాలి
+    if (Capacitor.isNativePlatform()) {
+      const permResult = await PushNotifications.requestPermissions();
+      if (permResult.receive === 'granted') {
+        await PushNotifications.register();
+        
+        // నేటివ్ టోకెన్ రిజిస్ట్రేషన్ లిెసనర్
+        PushNotifications.addListener('registration', async (token) => {
+          console.log('Native Push Registration Token:', token.value);
+          if (customerMobile && token.value) {
+            await sendTokenToBackend(customerMobile, token.value);
+          }
+        });
 
-      // కస్టమర్ మొబైల్ నంబర్ ఉంటే, ఆ టోకెన్‌ను బ్యాక్‌ఎండ్‌కు పంపుతాం
-      if (customerMobile && token) {
-        await sendTokenToBackend(customerMobile, token);
+        // నోటిఫికేషన్ రిసీవ్ అయినప్పుడు (లాక్ స్క్రీన్/హోమ్ స్క్రీన్ కోసం)
+        PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          console.log('Push notification received: ', notification);
+        });
       }
-      
-      return token;
     } else {
-      console.log('Notification permission denied.');
+      // వెబ్ బ్రౌజర్ కోసం ఫైర్‌బేస్ మెసేజింగ్
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        const token = await getToken(messaging, { 
+          vapidKey: 'BF-5htY4zliIE653UyTdHQ9Em8CbprK761jZb9_U60d1_dqh0FY25rOOEuG6Vy69jQdVI7kWVxMZPr4TipHzhhg' 
+        });
+        console.log('Web FCM Token:', token);
+
+        if (customerMobile && token) {
+          await sendTokenToBackend(customerMobile, token);
+        }
+        return token;
+      } else {
+        console.log('Notification permission denied.');
+      }
     }
   } catch (error) {
     console.error('Error getting notification token:', error);
   }
 };
 
+// ఫోర్‌గ్రౌండ్ లో ఎలాంటి ఇన్-యాప్ పాప్-అప్స్ రాకుండా కేవలం కన్సోల్ లాగ్ ఉంచడం
 export const onForegroundMessageListener = () => {
-  return onMessage(messaging, (payload) => {
-    console.log('Foreground message received:', payload);
-  });
+  if (!Capacitor.isNativePlatform()) {
+    return onMessage(messaging, (payload) => {
+      console.log('Foreground message received (No in-app toast):', payload);
+    });
+  }
 };
