@@ -8,10 +8,9 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet
 import 'leaflet/dist/leaflet.css';
 import CustomerSupportChat from './components/CustomerSupportChat';
 import OrderChatModal from './components/OrderChatModal'; 
-import logo from './assets/logo.png'; 
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeApp } from "firebase/app";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
 
 
 
@@ -60,8 +59,12 @@ function MapUpdater({ center }) {
 // --- SHOP BANNER AUTO-SLIDER COMPONENT ---
 function ShopBannerSlider({ selectedShop }) {
   const allShopImages = [
-    selectedShop.imageUrl || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5',
-    ...(selectedShop.additionalImages || [])
+    selectedShop.imageUrl 
+      ? (selectedShop.imageUrl.startsWith('http') ? selectedShop.imageUrl : `${API_BASE_URL}/${selectedShop.imageUrl.startsWith('/') ? selectedShop.imageUrl.slice(1) : selectedShop.imageUrl}`) 
+      : 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5',
+    ...(selectedShop.additionalImages || []).map(img => 
+      img.startsWith('http') ? img : `${API_BASE_URL}/${img.startsWith('/') ? img.slice(1) : img}`
+    )
   ];
 
   const [currentSlide, setCurrentSlide] = useState(0);
