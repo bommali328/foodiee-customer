@@ -11,6 +11,7 @@ import OrderChatModal from './components/OrderChatModal';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import logo from './assets/logo.png';
 
 
 
