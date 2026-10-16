@@ -129,6 +129,32 @@ export default function CustomerApp() {
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
+  useEffect(() => {
+    const userMob = phone || localStorage.getItem('userMobile');
+    if (userMob) {
+      const sendTokenToBackend = async () => {
+        try {
+          const currentToken = await getToken(messaging, { 
+            vapidKey: 'BF-5htY4zliIE653UyTdHQ9Em8CbprK761jZb9_U60d1_dqh0FY25rOOEuG6Vy69jQdVI7kWVxMZPr4TipHzhhg' 
+          });
+          if (currentToken) {
+            await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mobile: userMob, fcmToken: currentToken })
+            });
+            console.log("FCM Token successfully synced to database!");
+          }
+        } catch (error) {
+          console.error("FCM Token sync error:", error);
+        }
+        };
+      sendTokenToBackend();
+    }
+  }, [phone, isLoggedIn]);
+
+  
+
   const [activeTab, setActiveTab] = useState('home');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedShop, setSelectedShop] = useState(null);
@@ -794,30 +820,38 @@ export default function CustomerApp() {
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [editableAddress, setEditableAddress] = useState(address);
 
-  const detectLiveGpsLocation = () => {
-    if (navigator.geolocation) {
-      toast.loading('📍 Detecting live GPS location...');
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          setEditableAddress(prev => ({
-            ...prev,
-            latitude: lat,
-            longitude: lng,
-            street: `GPS Active (${lat.toFixed(4)}, ${lng.toFixed(4)})`
-          }));
-          toast.dismiss();
-          toast.success('📍 Live GPS coordinates detected successfully!');
-        },
-        (error) => {
-          toast.dismiss();
-          toast.error('❌ GPS permission denied or unavailable.');
-        },
-        { enableHighAccuracy: true }
-      );
-    }
-  };
+ // ✅ కస్టమర్ లైవ్ లొకేషన్ GPS డిటెక్ట్ చేసే ఫంక్షన్
+const detectLiveGpsLocation = () => {
+  if (!navigator.geolocation) {
+    toast.error('❌ మీ బ్రౌజర్ లొకేషన్‌ను సపోర్ట్ చేయడం లేదు');
+    return;
+  }
+
+  toast.loading('📍 లైవ్ లొకేషన్ డిటెక్ట్ చేస్తోంది...');
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      
+      // లొకేషన్ స్టేట్ లేదా అడ్రస్ ఆబ్జెక్ట్‌లో సేవ్ చేయడం
+      setAddress(prev => ({
+        ...prev,
+        latitude: lat,
+        longitude: lng,
+        street: prev.street ? prev.street : `GPS Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+      }));
+
+      toast.dismiss();
+      toast.success('📍 లొకేషన్ విజయవంతంగా క్యాప్చర్ చేయబడింది!');
+    },
+    (error) => {
+      toast.dismiss();
+      toast.error('❌ లొకేషన్ పర్మిషన్ నిరాకరించబడింది లేదా అందుబాటులో లేదు.');
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+};
 
   const handleSaveEditedAddress = (e) => {
     e.preventDefault();
@@ -1600,7 +1634,16 @@ export default function CustomerApp() {
                     const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ mobile: phone, name: name.trim(), password, role: 'Customer', walletBalance: 0.00, paymentHistory: [], scratchCards: [] })
+                      body: JSON.stringify({ 
+                        mobile: phone, 
+                         name: name.trim(), 
+                         fullName: name.trim(), // 👈 బ్యాక్‌ఎండ్ కోసం ఇది చాలా ముఖ్యం
+                        password: password, 
+                         role: 'Customer', 
+                         walletBalance: 0.00, 
+                         paymentHistory: [], 
+                             scratchCards: [] 
+                    })
                     });
                     const data = await res.json();
                     if (res.ok) {
