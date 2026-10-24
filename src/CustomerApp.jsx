@@ -9,24 +9,10 @@ import 'leaflet/dist/leaflet.css';
 import CustomerSupportChat from './components/CustomerSupportChat';
 import OrderChatModal from './components/OrderChatModal'; 
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { initializeApp } from "firebase/app";
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
 import logo from './assets/logo.png';
+import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 
-
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBP_A2y0eWPDEIZoX1RV0sl4E30j9WzIZ0",
-  authDomain: "foodiee-c1d35.firebaseapp.com",
-  projectId: "foodiee-c1d35",
-  storageBucket: "foodiee-c1d35.firebasestorage.app",
-  messagingSenderId: "375959156815",
-  appId: "1:375959156815:web:e8f604c166a4e641a2923a",
-  measurementId: "G-CWXX3TDZVY"
-};
-
-const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
 
 // ✅ BASE URL UPDATE (AWS)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.foodiee.shop";
@@ -130,28 +116,45 @@ export default function CustomerApp() {
   const [newPassword, setNewPassword] = useState('');
 
   useEffect(() => {
-    const userMob = phone || localStorage.getItem('userMobile');
-    if (userMob) {
-      const sendTokenToBackend = async () => {
-        try {
-          const currentToken = await getToken(messaging, { 
-            vapidKey: 'BF-5htY4zliIE653UyTdHQ9Em8CbprK761jZb9_U60d1_dqh0FY25rOOEuG6Vy69jQdVI7kWVxMZPr4TipHzhhg' 
-          });
-          if (currentToken) {
-            await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mobile: userMob, fcmToken: currentToken })
-            });
-            console.log("FCM Token successfully synced to database!");
+  const userMob = phone || localStorage.getItem('userMobile');
+  if (userMob) {
+    const registerNativePush = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          let permResult = await PushNotifications.checkPermissions();
+          if (permResult.receive === 'prompt') {
+            permResult = await PushNotifications.requestPermissions();
           }
-        } catch (error) {
-          console.error("FCM Token sync error:", error);
+          
+          if (permResult.receive === 'granted') {
+            await PushNotifications.register();
+            
+            // నేటివ్ టోకెన్ రిజిస్ట్రేషన్ లిసనర్
+            PushNotifications.addListener('registration', async (token) => {
+              console.log('Native Push Registration Token:', token.value);
+              if (userMob && token.value) {
+                await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ mobile: userMob, fcmToken: token.value })
+                });
+                console.log("FCM Token successfully synced to database!");
+              }
+            });
+
+            PushNotifications.addListener('pushNotificationReceived', (notification) => {
+              console.log('Push notification received: ', notification);
+            });
+          }
         }
-        };
-      sendTokenToBackend();
-    }
-  }, [phone, isLoggedIn]);
+      } catch (error) {
+        console.error("FCM Token sync error:", error);
+      }
+    };
+
+    registerNativePush();
+  }
+}, [phone, isLoggedIn]);
 
   
 
@@ -169,7 +172,8 @@ export default function CustomerApp() {
 
   const [isWalletHistoryOpen, setIsWalletHistoryOpen] = useState(false);
   const [scratchCards, setScratchCards] = useState(() => {
-    const saved = localStorage.getItem('foodiee_saved_scratch_cards');
+    const userMob = localStorage.getItem('userMobile');
+    const saved = localStorage.getItem(`foodiee_saved_scratch_cards_${userMob}`);
     return saved !== null ? JSON.parse(saved) : [];
   });
   const [activeScratchCard, setActiveScratchCard] = useState(null);
@@ -189,7 +193,7 @@ export default function CustomerApp() {
   const [deliveryBoyCoords, setDeliveryBoyCoords] = useState({ lat: 18.5793, lng: 84.4452 });
 
   const [availablePromos, setAvailablePromos] = useState([
-    { code: 'FIRST50', discount: '₹50 OFF', minOrder: 199, isActive: true }
+    { code: 'FIRST20', discount: '₹20 OFF', minOrder: 199, isActive: true }
   ]);
   const [promoPopup, setPromoPopup] = useState(null);
 
@@ -208,60 +212,66 @@ export default function CustomerApp() {
     }
   };
 
-  const fetchFCMToken = async () => {
-    try {
-      const currentToken = await getToken(messaging, { 
-        vapidKey: 'BF-5htY4zliIE653UyTdHQ9Em8CbprK761jZb9_U60d1_dqh0FY25rOOEuG6Vy69jQdVI7kWVxMZPr4TipHzhhg' 
-      });
-      if (currentToken) {
-        console.log('Customer FCM Token:', currentToken);
-        // ఈ టోకెన్‌ని బ్యాక్‌ఎండ్‌కి పంపే లాజిక్ ఇక్కడ రాసుకోవచ్చు
-      } else {
-        console.log('No registration token available.');
+ const fetchFCMToken = async () => {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      let permResult = await PushNotifications.checkPermissions();
+      if (permResult.receive === 'prompt') {
+        permResult = await PushNotifications.requestPermissions();
       }
-    } catch (err) {
-      console.log('An error occurred while retrieving token. ', err);
-    }
-  };
-
-  // యాప్ ఓపెన్ అయినప్పుడు దీన్ని కాల్ చేయడానికి useEffect లో పెట్టుకోండి
-  useEffect(() => {
-    fetchFCMToken();
-  }, []);
-
-  useEffect(() => {
-    if ("Notification" in window && Notification.permission !== "granted") {
-      Notification.requestPermission();
-    } else if ("Notification" in window && Notification.permission === "granted") {
-      // 👇 ఇక్కడ FCM టోకెన్ తీసుకొని బ్యాక్‌ఎండ్‌కు పంపే కోడ్ పెట్టాలి
-      const sendToken = async () => {
-        try {
-          const userMob = phone || localStorage.getItem('userMobile');
-          if (!userMob) return;
+      
+      if (permResult.receive === 'granted') {
+        await PushNotifications.register();
+        
+        // నేటివ్ టోకెన్ రిజిస్ట్రేషన్ లిసనర్
+        PushNotifications.addListener('registration', async (token) => {
+          console.log('Customer FCM Token (Native):', token.value);
           
-          const token = await getToken(messaging, { 
-            vapidKey: 'BF-5htY4zliIE653UyTdHQ9Em8CbprK761jZb9_U60d1_dqh0FY25rOOEuG6Vy69jQdVI7kWVxMZPr4TipHzhhg' 
-          });
-
-          if (token) {
-            await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
+          // టోకెన్‌ని బ్యాక్‌ఎండ్‌కి పంపే కోడ్
+          const userMob = localStorage.getItem('userMobile');
+          if (userMob && token.value) {
+            await fetch('https://api.foodiee.shop/api/customers/update-fcm-token', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mobile: userMob, fcmToken: token })
+              body: JSON.stringify({ mobile: userMob, fcmToken: token.value })
             });
-            console.log("FCM Token synced successfully!");
+            console.log("FCM Token successfully synced to database!");
           }
-        } catch (err) {
-          console.error("Token sync error:", err);
-        }
-      };
-      sendToken();
+        });
+      }
+    } else {
+      console.log('Running on non-native platform. Skipping native push registration.');
     }
+  } catch (err) {
+    console.log('An error occurred while retrieving token. ', err);
+  }
+};
 
-    localStorage.setItem('foodiee_saved_scratch_cards', JSON.stringify(scratchCards));
-  }, [scratchCards, phone]);
+// ✅ యూజర్-స్పెసిఫిక్ స్క్రాచ్ కార్డ్స్ సేవ్ కావడానికి
+  useEffect(() => {
+    const userMob = localStorage.getItem('userMobile');
+    if (userMob) {
+      localStorage.setItem(`foodiee_saved_scratch_cards_${userMob}`, JSON.stringify(scratchCards));
+    }
+  }, [scratchCards]);
 
-  
+  // ✅ యూజర్-స్పెసిఫిక్ వాలెట్ బ్యాలెన్స్ సింక్ కావడానికి
+  useEffect(() => {
+    const userMob = localStorage.getItem('userMobile');
+    if (userMob) {
+      localStorage.setItem(`foodiee_wallet_balance_${userMob}`, walletBalance);
+    }
+  }, [walletBalance]);
+
+  // ✅ యూజర్-స్పెసిఫిక్ పేమెంట్ హిస్టరీ సేవ్ కావడానికి
+  useEffect(() => {
+    const userMob = localStorage.getItem('userMobile');
+    if (userMob) {
+      localStorage.setItem(`foodiee_payment_history_${userMob}`, JSON.stringify(paymentHistory));
+    }
+  }, [paymentHistory]);
+
+
 
   useEffect(() => {
     const requestCapacitorNotifications = async () => {
@@ -1530,42 +1540,48 @@ const detectLiveGpsLocation = () => {
     });
     const responseData = await res.json();
     
-    if (res.ok) {
-        // 🌟 సర్వర్ నుండి వచ్చే రెస్పాన్స్ स्ट्रक्चर ప్రకారం యూజర్ డేటాను తీసుకోవడం
-        const userData = responseData.data || responseData;
+   if (res.ok) {
+    // 🌟 సర్వర్ నుండి వచ్చే రెస్పాన్స్ స్ట్రక్చర్ ప్రకారం యూజర్ డేటాను తీసుకోవడం
+    const userData = responseData.data || responseData;
+    const userMobileNum = userData.mobile || phone;
 
-        const fetchedName = userData.name && userData.name.trim() !== '' ? userData.name : 'User';
-        localStorage.setItem('userMobile', userData.mobile || phone);
-        localStorage.setItem('userName', fetchedName);
-        setAddress(prev => ({ ...prev, name: fetchedName }));
-        
-        // డేటాబేస్ నుండి వాలెట్ బ్యాలెన్స్ సరిగ్గా రీడ్ చేయడానికి
-        const previousBalance = userData.walletBalance !== undefined ? parseFloat(userData.walletBalance) : 0.00;
-        localStorage.setItem('foodiee_wallet_balance', previousBalance);
-        setWalletBalance(previousBalance);
+    const fetchedName = userData.name && userData.name.trim() !== '' ? userData.name : 'User';
+    localStorage.setItem('userMobile', userMobileNum);
+    localStorage.setItem('userName', fetchedName);
+    setAddress(prev => ({ ...prev, name: fetchedName }));
+    
+    // ✅ డేటాబేస్ నుండి యూజర్-స్పెసిఫిక్ వాలెట్ బ్యాలెన్స్ రీడ్ & సేవ్ చేయడం
+    const previousBalance = userData.walletBalance !== undefined ? parseFloat(userData.walletBalance) : 0.00;
+    localStorage.setItem(`foodiee_wallet_balance_${userMobileNum}`, previousBalance);
+    setWalletBalance(previousBalance);
 
-        if (userData.paymentHistory) {
-            localStorage.setItem('foodiee_payment_history', JSON.stringify(userData.paymentHistory));
-            setPaymentHistory(userData.paymentHistory);
-        }
-
-        if (userData.scratchCards) {
-            localStorage.setItem('foodiee_saved_scratch_cards', JSON.stringify(userData.scratchCards));
-            setScratchCards(userData.scratchCards);
-        }
-
-        const orderRes = await fetch(`${API_BASE_URL}/api/orders/customer/${userData.mobile || phone}`);
-        if (orderRes.ok) {
-            const orderData = await orderRes.json();
-            setBackendOrders(orderData);
-        }
-
-        setAddress(prev => ({ ...prev, name: fetchedName, mobile: userData.mobile || phone }));
-        setIsLoggedIn(true);
-        toast.success(`🎉 Welcome back, ${fetchedName}!`);
-    } else {
-        toast.error(responseData.error || '❌ Mobile number and Password do not match! Cannot login.');
+    // ✅ యూజర్-స్పెసిఫిక్ పేమెంట్ హిస్టరీ
+    if (userData.paymentHistory) {
+        localStorage.setItem(`foodiee_payment_history_${userMobileNum}`, JSON.stringify(userData.paymentHistory));
+        setPaymentHistory(userData.paymentHistory);
     }
+
+    // ✅ యూజర్-స్పెసిఫిక్ స్క్రాచ్ కార్డ్స్ హిస్టరీ
+    if (userData.scratchCards) {
+        localStorage.setItem(`foodiee_saved_scratch_cards_${userMobileNum}`, JSON.stringify(userData.scratchCards));
+        setScratchCards(userData.scratchCards);
+    } else {
+        const savedCards = localStorage.getItem(`foodiee_saved_scratch_cards_${userMobileNum}`);
+        setScratchCards(savedCards ? JSON.parse(savedCards) : []);
+    }
+
+    const orderRes = await fetch(`${API_BASE_URL}/api/orders/customer/${userMobileNum}`);
+    if (orderRes.ok) {
+        const orderData = await orderRes.json();
+        setBackendOrders(orderData);
+    }
+
+    setAddress(prev => ({ ...prev, name: fetchedName, mobile: userMobileNum }));
+    setIsLoggedIn(true);
+    toast.success(`🎉 Welcome back, ${fetchedName}!`);
+} else {
+    toast.error(responseData.error || '❌ Mobile number and Password do not match! Cannot login.');
+}
 } catch (err) {
     toast.error('❌ Network error during login');
 }
@@ -2006,16 +2022,32 @@ const detectLiveGpsLocation = () => {
                   </div>
 
                   <div className="pt-2 pb-6 shrink-0 border-t border-gray-200 dark:border-slate-700 mt-auto">
-                    <button 
-                      onClick={() => { 
-                        localStorage.removeItem('userMobile'); 
-                        localStorage.removeItem('userName'); 
-                        setIsLoggedIn(false); 
-                      }} 
-                      className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-3.5 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
-                    >
-                      <LogOut size={12} /> Logout from Foodiee
-                    </button>
+                   <button 
+  onClick={() => { 
+    // 1. లోకల్ స్టోరేజ్‌లో ఉన్న యూజర్ డేటా మరియు క్యాచ్‌ని పూర్తిగా తొలగించడం
+    localStorage.removeItem('userMobile'); 
+    localStorage.removeItem('userName'); 
+    localStorage.removeItem('foodiee_wallet_balance');
+    localStorage.removeItem('foodiee_payment_history');
+    localStorage.removeItem('foodiee_saved_scratch_cards');
+    localStorage.removeItem('foodiee_active_address');
+    localStorage.removeItem('foodiee_multiple_addresses');
+    localStorage.removeItem('foodiee_seen_promos');
+    
+    // 2. లాగిన్ స్టేట్‌ను వెంటనే false కి మార్చడం
+    setIsLoggedIn(false); 
+    setPhone('');
+    setPassword('');
+    
+    // 3. డ్రాయర్ లేదా మోడల్స్ ఏవైనా ఓపెన్ ఉంటే వాటిని క్లోజ్ చేయడం
+    setIsDrawerOpen(false);
+    
+    toast.success('✓ Logged out successfully');
+  }} 
+  className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-3.5 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+>
+  <LogOut size={12} /> Logout from Foodiee
+</button>
                   </div>
                 </div>
                 <div className="flex-1 bg-black/40" onClick={() => setIsDrawerOpen(false)}></div>
