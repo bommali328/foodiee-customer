@@ -99,9 +99,7 @@ function ShopBannerSlider({ selectedShop }) {
 }
 
 export default function CustomerApp() {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem('userMobile') ? true : false;
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   
   const [authMode, setAuthMode] = useState('login');
   const [enteredPin, setEnteredPin] = useState('');
@@ -115,49 +113,45 @@ export default function CustomerApp() {
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
+  // ✅ Native Push Notifications Registration
   useEffect(() => {
-  const userMob = phone || localStorage.getItem('userMobile');
-  if (userMob) {
-    const registerNativePush = async () => {
-      try {
-        if (Capacitor.isNativePlatform()) {
-          let permResult = await PushNotifications.checkPermissions();
-          if (permResult.receive === 'prompt') {
-            permResult = await PushNotifications.requestPermissions();
-          }
-          
-          if (permResult.receive === 'granted') {
-            await PushNotifications.register();
+    const userMob = phone || localStorage.getItem('userMobile');
+    if (userMob) {
+      const registerNativePush = async () => {
+        try {
+          // 🌟 ముఖ్యం: ఇది కేవలం నేటివ్ ఆండ్రాయిడ్/ఐఓఎస్ లో మాత్రమే రన్ అవ్వాలి
+          if (Capacitor.isNativePlatform()) {
+            let permResult = await PushNotifications.checkPermissions();
+            if (permResult.receive === 'prompt') {
+              permResult = await PushNotifications.requestPermissions();
+            }
             
-            // నేటివ్ టోకెన్ రిజిస్ట్రేషన్ లిసనర్
-            PushNotifications.addListener('registration', async (token) => {
-              console.log('Native Push Registration Token:', token.value);
-              if (userMob && token.value) {
-                await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ mobile: userMob, fcmToken: token.value })
-                });
-                console.log("FCM Token successfully synced to database!");
-              }
-            });
-
-            PushNotifications.addListener('pushNotificationReceived', (notification) => {
-              console.log('Push notification received: ', notification);
-            });
+            if (permResult.receive === 'granted') {
+              await PushNotifications.register();
+              
+              PushNotifications.addListener('registration', async (token) => {
+                console.log('Native Push Registration Token:', token.value);
+                if (userMob && token.value) {
+                  await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mobile: userMob, fcmToken: token.value })
+                  });
+                  console.log("FCM Token successfully synced to database!");
+                }
+              });
+            }
+          } else {
+            console.log("Running on Web Browser. PushNotifications plugin skipped.");
           }
+        } catch (error) {
+          console.error("FCM Token sync error:", error);
         }
-      } catch (error) {
-        console.error("FCM Token sync error:", error);
-      }
-    };
+      };
 
-    registerNativePush();
-  }
-}, [phone, isLoggedIn]);
-
-  
-
+      registerNativePush();
+    }
+  }, [phone, isLoggedIn]);
   const [activeTab, setActiveTab] = useState('home');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedShop, setSelectedShop] = useState(null);
@@ -171,11 +165,14 @@ export default function CustomerApp() {
   const [editProfileName, setEditProfileName] = useState('');
 
   const [isWalletHistoryOpen, setIsWalletHistoryOpen] = useState(false);
+  
+  // ✅ User-specific scratch cards storage
   const [scratchCards, setScratchCards] = useState(() => {
     const userMob = localStorage.getItem('userMobile');
     const saved = localStorage.getItem(`foodiee_saved_scratch_cards_${userMob}`);
     return saved !== null ? JSON.parse(saved) : [];
   });
+  
   const [activeScratchCard, setActiveScratchCard] = useState(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [scratchProgress, setScratchProgress] = useState(0);
@@ -202,7 +199,7 @@ export default function CustomerApp() {
     { id: 2, title: '🛒 Free Delivery', desc: 'Free delivery on all grocery orders above ₹199 in Ichapuram.', time: '2 hrs ago', unread: true }
   ]);
 
-  // ✅ Native Notification Helper Function for WhatsApp-like lock screen alerts
+  // ✅ Native Notification Helper Function
   const showNativeNotification = (title, bodyText) => {
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification(title || "Foodiee Notification", {
@@ -212,42 +209,7 @@ export default function CustomerApp() {
     }
   };
 
- const fetchFCMToken = async () => {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      let permResult = await PushNotifications.checkPermissions();
-      if (permResult.receive === 'prompt') {
-        permResult = await PushNotifications.requestPermissions();
-      }
-      
-      if (permResult.receive === 'granted') {
-        await PushNotifications.register();
-        
-        // నేటివ్ టోకెన్ రిజిస్ట్రేషన్ లిసనర్
-        PushNotifications.addListener('registration', async (token) => {
-          console.log('Customer FCM Token (Native):', token.value);
-          
-          // టోకెన్‌ని బ్యాక్‌ఎండ్‌కి పంపే కోడ్
-          const userMob = localStorage.getItem('userMobile');
-          if (userMob && token.value) {
-            await fetch('https://api.foodiee.shop/api/customers/update-fcm-token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mobile: userMob, fcmToken: token.value })
-            });
-            console.log("FCM Token successfully synced to database!");
-          }
-        });
-      }
-    } else {
-      console.log('Running on non-native platform. Skipping native push registration.');
-    }
-  } catch (err) {
-    console.log('An error occurred while retrieving token. ', err);
-  }
-};
-
-// ✅ యూజర్-స్పెసిఫిక్ స్క్రాచ్ కార్డ్స్ సేవ్ కావడానికి
+  // ✅ User-specific local storage synchronization hooks
   useEffect(() => {
     const userMob = localStorage.getItem('userMobile');
     if (userMob) {
@@ -255,7 +217,12 @@ export default function CustomerApp() {
     }
   }, [scratchCards]);
 
-  // ✅ యూజర్-స్పెసిఫిక్ వాలెట్ బ్యాలెన్స్ సింక్ కావడానికి
+  const [walletBalance, setWalletBalance] = useState(() => {
+    const userMob = localStorage.getItem('userMobile');
+    const saved = localStorage.getItem(`foodiee_wallet_balance_${userMob}`);
+    return saved !== null ? parseFloat(saved) : 0.00;
+  });
+
   useEffect(() => {
     const userMob = localStorage.getItem('userMobile');
     if (userMob) {
@@ -263,7 +230,12 @@ export default function CustomerApp() {
     }
   }, [walletBalance]);
 
-  // ✅ యూజర్-స్పెసిఫిక్ పేమెంట్ హిస్టరీ సేవ్ కావడానికి
+  const [paymentHistory, setPaymentHistory] = useState(() => {
+    const userMob = localStorage.getItem('userMobile');
+    const saved = localStorage.getItem(`foodiee_payment_history_${userMob}`);
+    return saved !== null ? JSON.parse(saved) : [];
+  });
+
   useEffect(() => {
     const userMob = localStorage.getItem('userMobile');
     if (userMob) {
@@ -271,16 +243,12 @@ export default function CustomerApp() {
     }
   }, [paymentHistory]);
 
-
-
   useEffect(() => {
     const requestCapacitorNotifications = async () => {
       try {
         const permStatus = await LocalNotifications.requestPermissions();
         if (permStatus.display === 'granted') {
           console.log('Capacitor Notification permission granted!');
-        } else {
-          console.log('Capacitor Notification permission denied.');
         }
       } catch (e) {
         console.log('Not running in Capacitor native environment or error:', e);
@@ -288,38 +256,30 @@ export default function CustomerApp() {
     };
     requestCapacitorNotifications();
   }, []);
-  // లొకేషన్ మరియు కెమెరా పర్మిషన్స్ అడగడానికి
+
+  // Request device permissions (Location & Camera)
   useEffect(() => {
     const requestDevicePermissions = async () => {
-      // 1. Location Permission
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-          (position) => {
-            console.log("Location permission granted:", position.coords.latitude, position.coords.longitude);
-          },
-          (error) => {
-            console.log("Location permission denied or error:", error.message);
-          }
+          (position) => { console.log("Location granted"); },
+          (error) => { console.log("Location error:", error.message); }
         );
       }
-
-      // 2. Camera Permission
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          console.log("Camera permission granted.");
-          // పర్మిషన్ వచ్చాక స్ట్రీమ్ క్లోజ్ చేయడం
           stream.getTracks().forEach(track => track.stop());
         }
       } catch (err) {
-        console.log("Camera permission denied or error:", err.message);
+        console.log("Camera error:", err.message);
       }
     };
-
     requestDevicePermissions();
   }, []);
 
   useEffect(() => {
+    if (!isLoggedIn) return;
     const fetchActivePromos = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/promos/active`);
@@ -355,7 +315,7 @@ export default function CustomerApp() {
     fetchActivePromos();
     const interval = setInterval(fetchActivePromos, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     const userMob = phone || localStorage.getItem('userMobile');
@@ -409,13 +369,8 @@ export default function CustomerApp() {
 
         stompClient.subscribe('/topic/broadcast/customers', (message) => {
           const broadcastData = JSON.parse(message.body);
+          showNativeNotification(broadcastData.title || "🎉 Foodiee Special Offer", broadcastData.message || broadcastData.desc || "New offer available!");
           
-          const alertTitle = broadcastData.title || "🎉 Foodiee Special Offer";
-          const alertDesc = broadcastData.message || broadcastData.desc || "New offer available!";
-          showNativeNotification(alertTitle, alertDesc);
-
-          
-
           setNotifications(prev => [
             {
               id: Date.now(),
@@ -589,16 +544,6 @@ export default function CustomerApp() {
     return () => stompClient.deactivate();
   }, [activeTrackingOrder?.id]);
 
-  const [walletBalance, setWalletBalance] = useState(() => {
-    const saved = localStorage.getItem('foodiee_wallet_balance');
-    return saved !== null ? parseFloat(saved) : 0.00;
-  });
-
-  const [paymentHistory, setPaymentHistory] = useState(() => {
-    const saved = localStorage.getItem('foodiee_payment_history');
-    return saved !== null ? JSON.parse(saved) : [];
-  });
-
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -629,11 +574,9 @@ export default function CustomerApp() {
     }
   };
 
-  // ✅ Requirement 1: Scratch & Earn reward strictly below ₹20 (Max reward ~19)
   const triggerScratchCard = (orderId) => {
-    // E order ki already scratch card vachindo ledo check cheddam
     const alreadyGiven = scratchCards.some(c => c.orderId === orderId);
-    if (alreadyGiven) return; // Oka order ki okasare card ravali[cite: 10]
+    if (alreadyGiven) return;
 
     const rewardAmount = Math.floor(2 + Math.random() * 16);
     const timestamp = new Date().toLocaleString();
@@ -705,7 +648,6 @@ export default function CustomerApp() {
     return saved !== null ? JSON.parse(saved) : [];
   });
 
-  // ✅ Requirement 2: Ensure customer login name persists correctly in their profile
   const [address, setAddress] = useState(() => {
     const savedActive = localStorage.getItem('foodiee_active_address');
     if (savedActive !== null) {
@@ -763,18 +705,7 @@ export default function CustomerApp() {
       },
       (error) => {
         toast.dismiss();
-        let errorMessage = '❌ GPS unavailable. Please enter complete address manually.';
-        
-        // Browser permission block ayithe specific ga message chupinchadaniki
-        if (error.code === error.PERMISSION_DENIED) {
-          errorMessage = '❌ Location permission denied! Please enable GPS permissions in your browser settings.';
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          errorMessage = '❌ Location information is unavailable.';
-        } else if (error.code === error.TIMEOUT) {
-          errorMessage = '❌ Location request timed out. Please try again.';
-        }
-        
-        toast.error(errorMessage, { duration: 5000 });
+        toast.error('❌ GPS unavailable. Please enter complete address manually.');
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
@@ -830,38 +761,34 @@ export default function CustomerApp() {
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [editableAddress, setEditableAddress] = useState(address);
 
- // ✅ కస్టమర్ లైవ్ లొకేషన్ GPS డిటెక్ట్ చేసే ఫంక్షన్
-const detectLiveGpsLocation = () => {
-  if (!navigator.geolocation) {
-    toast.error('❌ మీ బ్రౌజర్ లొకేషన్‌ను సపోర్ట్ చేయడం లేదు');
-    return;
-  }
+  const detectLiveGpsLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('❌ మీ బ్రౌజర్ లొకేషన్‌ను సపోర్ట్ చేయడం లేదు');
+      return;
+    }
 
-  toast.loading('📍 లైవ్ లొకేషన్ డిటెక్ట్ చేస్తోంది...');
+    toast.loading('📍 లైవ్ లొకేషన్ డిటెక్ట్ చేస్తోంది...');
 
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      
-      // లొకేషన్ స్టేట్ లేదా అడ్రస్ ఆబ్జెక్ట్‌లో సేవ్ చేయడం
-      setAddress(prev => ({
-        ...prev,
-        latitude: lat,
-        longitude: lng,
-        street: prev.street ? prev.street : `GPS Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`
-      }));
-
-      toast.dismiss();
-      toast.success('📍 లొకేషన్ విజయవంతంగా క్యాప్చర్ చేయబడింది!');
-    },
-    (error) => {
-      toast.dismiss();
-      toast.error('❌ లొకేషన్ పర్మిషన్ నిరాకరించబడింది లేదా అందుబాటులో లేదు.');
-    },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-  );
-};
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setAddress(prev => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+          street: prev.street ? prev.street : `GPS Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+        }));
+        toast.dismiss();
+        toast.success('📍 లొకేషన్ విజయవంతంగా క్యాప్చర్ చేయబడింది!');
+      },
+      (error) => {
+        toast.dismiss();
+        toast.error('❌ లొకేషన్ పర్మిషన్ నిరాకరించబడింది లేదా అందుబాటులో లేదు.');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
 
   const handleSaveEditedAddress = (e) => {
     e.preventDefault();
@@ -869,14 +796,6 @@ const detectLiveGpsLocation = () => {
     setIsEditingAddress(false);
     toast.success('✓ Delivery address updated successfully!');
   };
-
-  useEffect(() => {
-    localStorage.setItem('foodiee_wallet_balance', walletBalance);
-  }, [walletBalance]);
-
-  useEffect(() => {
-    localStorage.setItem('foodiee_payment_history', JSON.stringify(paymentHistory));
-  }, [paymentHistory]);
 
   useEffect(() => {
     localStorage.setItem('foodiee_multiple_addresses', JSON.stringify(savedAddresses));
@@ -912,9 +831,7 @@ const detectLiveGpsLocation = () => {
         email: "user@foodiee.com",
         contact: address.mobile
       },
-      theme: {
-        color: "#fc8019"
-      }
+      theme: { color: "#fc8019" }
     };
 
     const rzp = new window.Razorpay(options);
@@ -1168,9 +1085,7 @@ const detectLiveGpsLocation = () => {
           email: "user@foodiee.com",
           contact: address.mobile
         },
-        theme: {
-          color: "#fc8019"
-        }
+        theme: { color: "#fc8019" }
       };
 
       const rzp = new window.Razorpay(options);
@@ -1533,58 +1448,54 @@ const detectLiveGpsLocation = () => {
                 <form onSubmit={async (e) => {
                   e.preventDefault();
                   try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile: phone, password, role: 'customer' })
-    });
-    const responseData = await res.json();
-    
-   if (res.ok) {
-    // 🌟 సర్వర్ నుండి వచ్చే రెస్పాన్స్ స్ట్రక్చర్ ప్రకారం యూజర్ డేటాను తీసుకోవడం
-    const userData = responseData.data || responseData;
-    const userMobileNum = userData.mobile || phone;
+                    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mobile: phone, password, role: 'customer' })
+                    });
+                    const responseData = await res.json();
+                    
+                    if (res.ok) {
+                      const userData = responseData.data || responseData;
+                      const userMobileNum = userData.mobile || phone;
 
-    const fetchedName = userData.name && userData.name.trim() !== '' ? userData.name : 'User';
-    localStorage.setItem('userMobile', userMobileNum);
-    localStorage.setItem('userName', fetchedName);
-    setAddress(prev => ({ ...prev, name: fetchedName }));
-    
-    // ✅ డేటాబేస్ నుండి యూజర్-స్పెసిఫిక్ వాలెట్ బ్యాలెన్స్ రీడ్ & సేవ్ చేయడం
-    const previousBalance = userData.walletBalance !== undefined ? parseFloat(userData.walletBalance) : 0.00;
-    localStorage.setItem(`foodiee_wallet_balance_${userMobileNum}`, previousBalance);
-    setWalletBalance(previousBalance);
+                      const fetchedName = userData.name && userData.name.trim() !== '' ? userData.name : 'User';
+                      localStorage.setItem('userMobile', userMobileNum);
+                      localStorage.setItem('userName', fetchedName);
+                      setAddress(prev => ({ ...prev, name: fetchedName }));
+                      
+                      const previousBalance = userData.walletBalance !== undefined ? parseFloat(userData.walletBalance) : 0.00;
+                      localStorage.setItem(`foodiee_wallet_balance_${userMobileNum}`, previousBalance);
+                      setWalletBalance(previousBalance);
 
-    // ✅ యూజర్-స్పెసిఫిక్ పేమెంట్ హిస్టరీ
-    if (userData.paymentHistory) {
-        localStorage.setItem(`foodiee_payment_history_${userMobileNum}`, JSON.stringify(userData.paymentHistory));
-        setPaymentHistory(userData.paymentHistory);
-    }
+                      if (userData.paymentHistory) {
+                          localStorage.setItem(`foodiee_payment_history_${userMobileNum}`, JSON.stringify(userData.paymentHistory));
+                          setPaymentHistory(userData.paymentHistory);
+                      }
 
-    // ✅ యూజర్-స్పెసిఫిక్ స్క్రాచ్ కార్డ్స్ హిస్టరీ
-    if (userData.scratchCards) {
-        localStorage.setItem(`foodiee_saved_scratch_cards_${userMobileNum}`, JSON.stringify(userData.scratchCards));
-        setScratchCards(userData.scratchCards);
-    } else {
-        const savedCards = localStorage.getItem(`foodiee_saved_scratch_cards_${userMobileNum}`);
-        setScratchCards(savedCards ? JSON.parse(savedCards) : []);
-    }
+                      if (userData.scratchCards) {
+                          localStorage.setItem(`foodiee_saved_scratch_cards_${userMobileNum}`, JSON.stringify(userData.scratchCards));
+                          setScratchCards(userData.scratchCards);
+                      } else {
+                          const savedCards = localStorage.getItem(`foodiee_saved_scratch_cards_${userMobileNum}`);
+                          setScratchCards(savedCards ? JSON.parse(savedCards) : []);
+                      }
 
-    const orderRes = await fetch(`${API_BASE_URL}/api/orders/customer/${userMobileNum}`);
-    if (orderRes.ok) {
-        const orderData = await orderRes.json();
-        setBackendOrders(orderData);
-    }
+                      const orderRes = await fetch(`${API_BASE_URL}/api/orders/customer/${userMobileNum}`);
+                      if (orderRes.ok) {
+                          const orderData = await orderRes.json();
+                          setBackendOrders(orderData);
+                      }
 
-    setAddress(prev => ({ ...prev, name: fetchedName, mobile: userMobileNum }));
-    setIsLoggedIn(true);
-    toast.success(`🎉 Welcome back, ${fetchedName}!`);
-} else {
-    toast.error(responseData.error || '❌ Mobile number and Password do not match! Cannot login.');
-}
-} catch (err) {
-    toast.error('❌ Network error during login');
-}
+                      setAddress(prev => ({ ...prev, name: fetchedName, mobile: userMobileNum }));
+                      setIsLoggedIn(true);
+                      toast.success(`🎉 Welcome back, ${fetchedName}!`);
+                    } else {
+                      toast.error(responseData.error || '❌ Mobile number and Password do not match! Cannot login.');
+                    }
+                  } catch (err) {
+                      toast.error('❌ Network error during login');
+                  }
                 }} className="space-y-4">
                   <div className="space-y-1">
                     <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">Mobile Number</label>
@@ -1652,14 +1563,14 @@ const detectLiveGpsLocation = () => {
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ 
                         mobile: phone, 
-                         name: name.trim(), 
-                         fullName: name.trim(), // 👈 బ్యాక్‌ఎండ్ కోసం ఇది చాలా ముఖ్యం
+                        name: name.trim(), 
+                        fullName: name.trim(), 
                         password: password, 
-                         role: 'Customer', 
-                         walletBalance: 0.00, 
-                         paymentHistory: [], 
-                             scratchCards: [] 
-                    })
+                        role: 'Customer', 
+                        walletBalance: 0.00, 
+                        paymentHistory: [], 
+                        scratchCards: [] 
+                      })
                     });
                     const data = await res.json();
                     if (res.ok) {
@@ -1753,134 +1664,125 @@ const detectLiveGpsLocation = () => {
                 </form>
               )}
 
-            
-            {authMode === 'forgot' && (
-  <form onSubmit={async (e) => {
-    e.preventDefault();
-    
-    // Step 2: Final submit to reset password with 4-digit PIN and new password
-    const pwdRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!\%*#?&]{6,}$/;
-    if (!pwdRegex.test(newPassword)) {
-      toast.error('❌ Password must be at least 6 characters long and contain letters, numbers, and special characters!');
-      return;
-    }
+              {authMode === 'forgot' && (
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  const pwdRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{6,}$/;
+                  if (!pwdRegex.test(newPassword)) {
+                    toast.error('❌ Password must be at least 6 characters long and contain letters, numbers, and special characters!');
+                    return;
+                  }
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          mobile: phone, 
-          otp: enteredPin, // 4-digit PIN
-          newPassword: newPassword, 
-          role: 'customer' 
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success('✓ Password updated successfully!');
-        setAuthMode('login');
-        setEnteredPin('');
-        setNewPassword('');
-      } else {
-        toast.error(data.error || 'Failed to reset password');
-      }
-    } catch (err) {
-      toast.error('❌ Network error during password reset');
-    }
-  }} className="space-y-4">
-    
-    {/* Box 1: Registered Mobile Number */}
-    <div className="space-y-1">
-      <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">1. Registered Mobile Number</label>
-      <input 
-        type="tel" 
-        maxLength="10" 
-        value={phone} 
-        onChange={(e) => setPhone(e.target.value)} 
-        placeholder="10-digit mobile number" 
-        className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-xs font-bold text-white outline-none" 
-        required 
-      />
-    </div>
+                  try {
+                    const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                        mobile: phone, 
+                        otp: enteredPin, 
+                        newPassword: newPassword, 
+                        role: 'customer' 
+                      })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      toast.success('✓ Password updated successfully!');
+                      setAuthMode('login');
+                      setEnteredPin('');
+                      setNewPassword('');
+                    } else {
+                      toast.error(data.error || 'Failed to reset password');
+                    }
+                  } catch (err) {
+                    toast.error('❌ Network error during password reset');
+                  }
+                }} className="space-y-4">
+                  
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">1. Registered Mobile Number</label>
+                    <input 
+                      type="tel" 
+                      maxLength="10" 
+                      value={phone} 
+                      onChange={(e) => setPhone(e.target.value)} 
+                      placeholder="10-digit mobile number" 
+                      className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-xs font-bold text-white outline-none" 
+                      required 
+                    />
+                  </div>
 
-    {/* Box 2: Send OTP / Enter Button to trigger WhatsApp PIN */}
-    <div>
-      <button 
-        type="button" 
-        onClick={async () => {
-          if (!phone || phone.length !== 10) {
-            toast.error('❌ Please enter a valid 10-digit mobile number first');
-            return;
-          }
-          try {
-            const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mobile: phone, role: 'customer' })
-            });
-            const data = await res.json();
-            if (res.ok) {
-              toast.success('✓ 4-digit PIN sent to WhatsApp!');
-              if (data.whatsappRedirectUrl) {
-                window.open(data.whatsappRedirectUrl, '_blank');
-              }
-            } else {
-              toast.error(data.error || 'Mobile number not found');
-            }
-          } catch (err) {
-            toast.error('❌ Network error while sending PIN');
-          }
-        }}
-        className="w-full bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 py-2.5 rounded-xl font-black text-xs shadow cursor-pointer transition"
-      >
-        2. Send OTP / Get WhatsApp PIN 💬
-      </button>
-    </div>
+                  <div>
+                    <button 
+                      type="button" 
+                      onClick={async () => {
+                        if (!phone || phone.length !== 10) {
+                          toast.error('❌ Please enter a valid 10-digit mobile number first');
+                          return;
+                        }
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ mobile: phone, role: 'customer' })
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            toast.success('✓ 4-digit PIN sent to WhatsApp!');
+                            if (data.whatsappRedirectUrl) {
+                              window.open(data.whatsappRedirectUrl, '_blank');
+                            }
+                          } else {
+                            toast.error(data.error || 'Mobile number not found');
+                          }
+                        } catch (err) {
+                          toast.error('❌ Network error while sending PIN');
+                        }
+                      }}
+                      className="w-full bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 py-2.5 rounded-xl font-black text-xs shadow cursor-pointer transition"
+                    >
+                      2. Send OTP / Get WhatsApp PIN 💬
+                    </button>
+                  </div>
 
-    {/* Box 3: Enter 4-Digit PIN */}
-    <div className="space-y-1">
-      <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">3. Enter 4-Digit PIN</label>
-      <input 
-        type="text" 
-        maxLength="4" 
-        value={enteredPin || ''} 
-        onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, ''))} 
-        placeholder="1234" 
-        className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-center text-base font-black text-amber-400 tracking-[0.4em] outline-none" 
-        required 
-      />
-    </div>
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">3. Enter 4-Digit PIN</label>
+                    <input 
+                      type="text" 
+                      maxLength="4" 
+                      value={enteredPin || ''} 
+                      onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, ''))} 
+                      placeholder="1234" 
+                      className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-center text-base font-black text-amber-400 tracking-[0.4em] outline-none" 
+                      required 
+                    />
+                  </div>
 
-    {/* Box 4: New Password */}
-    <div className="space-y-1">
-      <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">4. New Password</label>
-      <input 
-        type="password" 
-        value={newPassword} 
-        onChange={(e) => setNewPassword(e.target.value)} 
-        placeholder="e.g. NewPass@123" 
-        className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-xs font-bold text-white outline-none" 
-        required 
-      />
-    </div>
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest pl-1">4. New Password</label>
+                    <input 
+                      type="password" 
+                      value={newPassword} 
+                      onChange={(e) => setNewPassword(e.target.value)} 
+                      placeholder="e.g. NewPass@123" 
+                      className="w-full bg-slate-950/60 border border-slate-700 px-4 py-3 rounded-2xl text-xs font-bold text-white outline-none" 
+                      required 
+                    />
+                  </div>
 
-    {/* Box 5: Submit / Update Password Button */}
-    <button 
-      type="submit" 
-      className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 py-3.5 rounded-2xl font-black text-xs shadow-xl cursor-pointer"
-    >
-      5. Submit & Update Password 🔒
-    </button>
+                  <button 
+                    type="submit" 
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 py-3.5 rounded-2xl font-black text-xs shadow-xl cursor-pointer"
+                  >
+                    5. Submit & Update Password 🔒
+                  </button>
 
-    <div className="text-center pt-1">
-      <span onClick={() => setAuthMode('login')} className="text-[11px] text-slate-400 underline cursor-pointer font-bold hover:text-white">
-        Back to Login
-      </span>
-    </div>
-  </form>
-)}
-
+                  <div className="text-center pt-1">
+                    <span onClick={() => setAuthMode('login')} className="text-[11px] text-slate-400 underline cursor-pointer font-bold hover:text-white">
+                      Back to Login
+                    </span>
+                  </div>
+                </form>
+              )}
 
             </div>
           </div>
@@ -2022,32 +1924,26 @@ const detectLiveGpsLocation = () => {
                   </div>
 
                   <div className="pt-2 pb-6 shrink-0 border-t border-gray-200 dark:border-slate-700 mt-auto">
-                   <button 
-  onClick={() => { 
-    // 1. లోకల్ స్టోరేజ్‌లో ఉన్న యూజర్ డేటా మరియు క్యాచ్‌ని పూర్తిగా తొలగించడం
-    localStorage.removeItem('userMobile'); 
-    localStorage.removeItem('userName'); 
-    localStorage.removeItem('foodiee_wallet_balance');
-    localStorage.removeItem('foodiee_payment_history');
-    localStorage.removeItem('foodiee_saved_scratch_cards');
-    localStorage.removeItem('foodiee_active_address');
-    localStorage.removeItem('foodiee_multiple_addresses');
-    localStorage.removeItem('foodiee_seen_promos');
-    
-    // 2. లాగిన్ స్టేట్‌ను వెంటనే false కి మార్చడం
-    setIsLoggedIn(false); 
-    setPhone('');
-    setPassword('');
-    
-    // 3. డ్రాయర్ లేదా మోడల్స్ ఏవైనా ఓపెన్ ఉంటే వాటిని క్లోజ్ చేయడం
-    setIsDrawerOpen(false);
-    
-    toast.success('✓ Logged out successfully');
-  }} 
-  className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-3.5 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
->
-  <LogOut size={12} /> Logout from Foodiee
-</button>
+                    <button 
+                      onClick={() => { 
+                        localStorage.removeItem('userMobile'); 
+                        localStorage.removeItem('userName'); 
+                        localStorage.removeItem('foodiee_wallet_balance');
+                        localStorage.removeItem('foodiee_payment_history');
+                        localStorage.removeItem('foodiee_saved_scratch_cards');
+                        localStorage.removeItem('foodiee_active_address');
+                        localStorage.removeItem('foodiee_multiple_addresses');
+                        localStorage.removeItem('foodiee_seen_promos');
+                        setIsLoggedIn(false); 
+                        setPhone('');
+                        setPassword('');
+                        setIsDrawerOpen(false);
+                        toast.success('✓ Logged out successfully');
+                      }} 
+                      className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-3.5 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+                    >
+                      <LogOut size={12} /> Logout from Foodiee
+                    </button>
                   </div>
                 </div>
                 <div className="flex-1 bg-black/40" onClick={() => setIsDrawerOpen(false)}></div>
@@ -2305,7 +2201,6 @@ const detectLiveGpsLocation = () => {
               </span>
             </div>
 
-            {/* ✅ WhatsApp OTP Display & Direct WhatsApp Button */}
             <div className="bg-amber-500/10 border-2 border-amber-500/40 p-4 rounded-2xl text-center space-y-2">
               <p className="text-amber-400 font-black uppercase tracking-wider text-[11px]">🔑 Secure Delivery OTP (Sent to WhatsApp)</p>
               <h3 className="text-2xl font-black text-white tracking-[0.2em]">
@@ -2730,13 +2625,13 @@ const detectLiveGpsLocation = () => {
                 </div>
               ) : activeTab === 'home' && !selectedCategory ? (
                 <div className="space-y-4 pb-4">
-                 <div className="space-y-3 pt-1">
-  <div className="flex items-center justify-between px-1">
-    <h3 className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Explore Categories</h3>
-    <span className="text-[10px] text-[#fc8019] font-bold"></span>
-  </div>
+                  <div className="space-y-3 pt-1">
+                    <div className="flex items-center justify-between px-1">
+                      <h3 className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">Explore Categories</h3>
+                    </div>
 
-  <div className="grid grid-cols-3 gap-3">
+                   
+                  <div className="grid grid-cols-3 gap-3">
     {[
       { 
         name: 'Food', 
@@ -2930,47 +2825,49 @@ const detectLiveGpsLocation = () => {
                             className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-slate-700/80 rounded-[30px] overflow-hidden shadow-xl shadow-black/30 cursor-pointer group hover:border-[#fc8019] transition-all duration-300 transform hover:scale-[1.01] relative"
                           >
                             <div className="absolute top-0 right-0 w-28 h-28 bg-orange-500/10 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all"></div>
-
+                            
                             <div className="w-full h-36 relative overflow-hidden bg-slate-950">
-                              <img 
-                                src={shop.imageUrl} 
-                                alt={shop.name} 
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90" 
-                              />
-                              {/* 👇 ఇక్కడ ఈ కోడ్ పేస్ట్ చేయాలి */}
-                {shop.shopOpen === false && (
-                   <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-20">
-                  <span className="bg-rose-500 text-white font-black px-3 py-1.5 rounded-full text-xs uppercase shadow-lg">Shop Closed ❌</span>
-              </div>
-                            )}
-                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
+    <img 
+        src={shop.imageUrl} 
+        alt={shop.name} 
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90" 
+    />
+    
+    {/* 👇 ఇక్కడ ఈ కోడ్ పేస్ట్ చేయాలి */}
+    {shop.shopOpen === false && (
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-20">
+            <span className="bg-rose-500 text-white font-black px-3 py-1.5 rounded-full text-xs uppercase shadow-lg">Shop Closed ❌</span>
+        </div>
+    )}
+    
+    <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-10">
+        <span className="bg-slate-950/80 backdrop-blur-md text-amber-400 border border-amber-500/30 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">
+            ⚡ {shop.time || '15-20 mins'}
+        </span>
+        <button 
+            onClick={(e) => { 
+                e.stopPropagation(); 
+                toggleFavorite(shop); 
+            }} 
+            className="w-9 h-9 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-700 flex items-center justify-center text-sm shadow transition hover:scale-110 cursor-pointer"
+        >
+            {favorites.some(f => f.id === shop.id) ? '❤' : '🤍'}
+        </button>
+    </div>
 
-                              <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-10">
-                                <span className="bg-slate-950/80 backdrop-blur-md text-amber-400 border border-amber-500/30 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">
-                                  ⚡ {shop.time || '15-20 mins'}
-                                </span>
-                                <button 
-                                  onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    toggleFavorite(shop); 
-                                  }} 
-                                  className="w-9 h-9 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-700 flex items-center justify-center text-sm shadow transition hover:scale-110 cursor-pointer"
-                                >
-                                  {favorites.some(f => f.id === shop.id) ? '❤️️' : '🤍'}
-                                </button>
-                              </div>
-
-                              <div className="absolute bottom-3 left-4 right-4 z-10 flex justify-between items-end">
-                                <div className="space-y-0.5">
-                                  <h4 className="text-sm font-black text-white group-hover:text-[#fc8019] transition-colors drop-shadow">
-                                    {shop.name}
-                                  </h4>
-                                  <p className="text-[10px] text-slate-300 font-medium truncate max-w-[220px]">
-                                    {shop.address}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
+    <div className="absolute bottom-3 left-4 right-4 z-10 flex justify-between items-end">
+        <div className="space-y-0.5">
+            <h4 className="text-sm font-black text-white group-hover:text-[#fc8019] transition-colors drop-shadow">
+                {shop.name}
+            </h4>
+            <p className="text-[10px] text-slate-300 font-medium truncate max-w-[220px]">
+                {shop.address}
+            </p>
+        </div>
+    </div>
+</div>
+                           
+                          
 
                             <div className="px-4 py-3 bg-slate-950/60 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
                               <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">
