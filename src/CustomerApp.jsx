@@ -43,20 +43,21 @@ function MapUpdater({ center }) {
   return null;
 }
 
-// --- SHOP BANNER AUTO-SLIDER COMPONENT ---
 function ShopBannerSlider({ selectedShop }) {
+  const [imageError, setImageError] = React.useState(false);
+
   const allShopImages = [
     selectedShop.imageUrl 
       ? (selectedShop.imageUrl.startsWith('http') ? selectedShop.imageUrl : `${API_BASE_URL}/${selectedShop.imageUrl.startsWith('/') ? selectedShop.imageUrl.slice(1) : selectedShop.imageUrl}`) 
-      : 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5',
+      : '',
     ...(selectedShop.additionalImages || []).map(img => 
       img.startsWith('http') ? img : `${API_BASE_URL}/${img.startsWith('/') ? img.slice(1) : img}`
     )
-  ];
+  ].filter(Boolean);
 
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [currentSlide, setCurrentSlide] = React.useState(0);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (allShopImages.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentSlide(prev => (prev + 1) % allShopImages.length);
@@ -66,14 +67,32 @@ function ShopBannerSlider({ selectedShop }) {
 
   return (
     <div className="w-full h-48 rounded-3xl overflow-hidden relative border border-slate-700 shadow-xl bg-slate-950 group">
-      {allShopImages.map((img, idx) => (
-        <div 
-          key={idx} 
-          className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${idx === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-        >
-          <img src={img} alt={`Slide ${idx}`} className="w-full h-full object-cover" />
+      {allShopImages.length === 0 || imageError ? (
+        // 👇 Image lenappudu or error vasthe ee stylish banner kanipistundi
+        <div className="absolute inset-0 bg-gradient-to-tr from-amber-600 via-orange-600 to-yellow-500 flex flex-col items-center justify-center p-4 text-center z-10">
+          <span className="text-4xl mb-1 drop-shadow-md">🏪</span>
+          <h2 className="text-xl font-black text-white tracking-widest drop-shadow-lg uppercase">
+            {selectedShop.name}
+          </h2>
+          <p className="text-[10px] text-slate-100 font-bold mt-1 bg-black/30 px-3 py-1 rounded-full backdrop-blur-xs">
+            {selectedShop.address || 'Ichapuram Main Road'}
+          </p>
         </div>
-      ))}
+      ) : (
+        allShopImages.map((img, idx) => (
+          <div 
+            key={idx} 
+            className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${idx === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+          >
+            <img 
+              src={img} 
+              alt={`Slide ${idx}`} 
+              onError={() => setImageError(true)} 
+              className="w-full h-full object-cover" 
+            />
+          </div>
+        ))
+      )}
 
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent z-20"></div>
 
@@ -83,7 +102,7 @@ function ShopBannerSlider({ selectedShop }) {
           <p className="text-[11px] text-slate-300 font-medium">{selectedShop.address}</p>
         </div>
 
-        {allShopImages.length > 1 && (
+        {allShopImages.length > 1 && !imageError && (
           <div className="flex gap-1.5 bg-black/40 backdrop-blur-md px-2 py-1 rounded-full border border-white/10">
             {allShopImages.map((_, i) => (
               <span 
@@ -98,9 +117,26 @@ function ShopBannerSlider({ selectedShop }) {
   );
 }
 
-export default function CustomerApp() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+const calculateDeliveryTime = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distanceKm = R * c; // Distance in km
   
+  // సగటున 1 కిమీకి 3 నిమిషాలు పడుతుంది అనుకుంటే
+  const estimatedMins = Math.max(10, Math.round(distanceKm * 3));
+  return `${estimatedMins} Mins`;
+};
+export default function CustomerApp() {
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('userMobile') ? true : false;
+  });
+
   const [authMode, setAuthMode] = useState('login');
   const [enteredPin, setEnteredPin] = useState('');
   const [showNotificationModal, setShowNotificationModal] = useState(false);
@@ -114,43 +150,44 @@ export default function CustomerApp() {
   const [newPassword, setNewPassword] = useState('');
 
   // ✅ Native Push Notifications Registration
+  // ✅ Native Push Notifications Registration (Safe for Web & Mobile)
   useEffect(() => {
     const userMob = phone || localStorage.getItem('userMobile');
-    if (userMob) {
-      const registerNativePush = async () => {
-        try {
-          // 🌟 ముఖ్యం: ఇది కేవలం నేటివ్ ఆండ్రాయిడ్/ఐఓఎస్ లో మాత్రమే రన్ అవ్వాలి
-          if (Capacitor.isNativePlatform()) {
-            let permResult = await PushNotifications.checkPermissions();
-            if (permResult.receive === 'prompt') {
-              permResult = await PushNotifications.requestPermissions();
-            }
-            
-            if (permResult.receive === 'granted') {
-              await PushNotifications.register();
-              
-              PushNotifications.addListener('registration', async (token) => {
-                console.log('Native Push Registration Token:', token.value);
-                if (userMob && token.value) {
-                  await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mobile: userMob, fcmToken: token.value })
-                  });
-                  console.log("FCM Token successfully synced to database!");
-                }
-              });
-            }
-          } else {
-            console.log("Running on Web Browser. PushNotifications plugin skipped.");
-          }
-        } catch (error) {
-          console.error("FCM Token sync error:", error);
-        }
-      };
+    if (!userMob) return;
 
-      registerNativePush();
-    }
+    const registerNativePush = async () => {
+      try {
+        // 🌟 ఇది కేవలం నేటివ్ ఆండ్రాయిడ్/ఐఓఎస్ లో మాత్రమే రన్ అవుతుంది
+        if (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform()) {
+          let permResult = await PushNotifications.checkPermissions();
+          if (permResult.receive === 'prompt') {
+            permResult = await PushNotifications.requestPermissions();
+          }
+          
+          if (permResult.receive === 'granted') {
+            await PushNotifications.register();
+            
+            PushNotifications.addListener('registration', async (token) => {
+              console.log('Native Push Registration Token:', token.value);
+              if (userMob && token.value) {
+                await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ mobile: userMob, fcmToken: token.value })
+                });
+                console.log("FCM Token successfully synced to database!");
+              }
+            });
+          }
+        } else {
+          console.log("Running on Web Browser. PushNotifications plugin skipped.");
+        }
+      } catch (error) {
+        console.log("Push notifications not supported in this environment.");
+      }
+    };
+
+    registerNativePush();
   }, [phone, isLoggedIn]);
   const [activeTab, setActiveTab] = useState('home');
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -574,16 +611,22 @@ export default function CustomerApp() {
     }
   };
 
-  const triggerScratchCard = (orderId) => {
-    const alreadyGiven = scratchCards.some(c => c.orderId === orderId);
+ const triggerScratchCard = (orderTotal, currentOrderId) => {
+    const alreadyGiven = scratchCards.some(c => c.orderId === currentOrderId);
     if (alreadyGiven) return;
 
-    const rewardAmount = Math.floor(2 + Math.random() * 16);
+    let rewardAmount = 0;
+    if (orderTotal >= 499) {
+      rewardAmount = Math.floor(13 + Math.random() * 13); 
+    } else {
+      rewardAmount = Math.floor(2 + Math.random() * 11); 
+    }
+
     const timestamp = new Date().toLocaleString();
 
     const newCard = {
       id: Date.now(),
-      orderId: orderId || Date.now(),
+      orderId: currentOrderId || Date.now(),
       amount: rewardAmount,
       isScratched: false,
       timestamp: timestamp
@@ -592,7 +635,6 @@ export default function CustomerApp() {
     setScratchCards(prev => [newCard, ...prev]);
     toast.success('🎁 You unlocked a new Scratch Card! Check Offers & Rewards.');
   };
-
   const startScratch = (e) => {
     setIsDrawing(true);
     scratch(e);
@@ -1051,7 +1093,7 @@ export default function CustomerApp() {
         setPromoCode('');
         setRiderTip(0);
         
-        triggerScratchCard(totalAmount);
+        triggerScratchCard(totalAmount, savedOrder.orderId || savedOrder.id);
 
         toast.success('🎉 Order Placed & Saved to History Successfully!');
       } else {
@@ -1999,12 +2041,27 @@ export default function CustomerApp() {
                     <span>💳 Pay Securely with Razorpay</span>
                   </button>
 
-                  <div className="space-y-2 pt-1 border-t border-slate-800">
-                    <p className="text-[10px] text-slate-400 uppercase font-bold">Or Pay Directly via Apps</p>
-                    <button onClick={() => handleUpiPayment('PhonePe', 'phonepe')} className="w-full bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-xl font-black text-xs shadow flex items-center justify-center gap-2">💜 Pay with PhonePe</button>
-                    <button onClick={() => handleUpiPayment('Google Pay', 'gpay')} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-xl font-black text-xs shadow flex items-center justify-center gap-2">💙 Pay with Google Pay (GPay)</button>
-                    <button onClick={() => handleUpiPayment('Paytm', 'paytm')} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white py-2.5 rounded-xl font-black text-xs shadow flex items-center justify-center gap-2">🤍 Pay with Paytm</button>
-                  </div>
+                 <div className="space-y-3 pt-3 border-t border-slate-800 text-center">
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Scan & Pay via Any UPI App (PhonePe / GPay / Paytm)</p>
+            
+            {addAmountInput && parseFloat(addAmountInput) > 0 ? (
+              <div className="bg-white p-4 rounded-3xl inline-block shadow-2xl mx-auto border-2 border-amber-500">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=nommali52@ybl&pn=FoodieeApp&am=${addAmountInput}&cu=INR`} 
+                  alt="UPI QR Code" 
+                  className="w-44 h-44 mx-auto rounded-xl"
+                />
+                <div className="mt-2 space-y-0.5">
+                  <p className="text-xs font-black text-slate-950">UPI ID: nbommali52@ybl</p>
+                  <p className="text-sm font-black text-emerald-600">Pay ₹{addAmountInput}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700">
+                <p className="text-xs text-slate-400 font-bold">ముందు పైన అమౌంట్ ఎంటర్ చేయండి, తరువాత ఆటోమేటిక్‌గా QR కోడ్ జనరేట్ అవుతుంది.</p>
+              </div>
+            )}
+          </div>
                 </div>
               </div>
             )}
@@ -2098,40 +2155,96 @@ export default function CustomerApp() {
                 </div>
               )}
 
-              {searchQuery.trim() !== '' && (
-                <div className="space-y-3 animate-fadeIn">
-                  <div className="flex justify-between items-center px-1">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-amber-400">
-                      Search Results for "{searchQuery}" ({dynamicShops.length} Stores Found)
-                    </h3>
-                    <button onClick={() => setSearchQuery('')} className="text-[10px] text-rose-400 font-bold underline cursor-pointer">
-                      Clear Search ❌
-                    </button>
-                  </div>
+             {searchQuery.trim() !== '' && (
+  <div className="space-y-4 animate-fadeIn">
+    <div className="flex justify-between items-center px-1">
+      <h3 className="text-xs font-black uppercase tracking-wider text-amber-400">
+        Search Results for "{searchQuery}"
+      </h3>
+      <button onClick={() => setSearchQuery('')} className="text-[10px] text-rose-400 font-bold underline cursor-pointer">
+        Clear Search ❌
+      </button>
+    </div>
 
-                  {dynamicShops.length === 0 ? (
-                    <div className="text-center py-16 bg-slate-900/60 rounded-3xl border border-slate-800 space-y-2">
-                      <span className="text-3xl">🔍</span>
-                      <p className="text-xs text-slate-400 font-bold">No shops or dishes found matching "{searchQuery}".</p>
-                    </div>
-                  ) : (
-                    dynamicShops.map(shop => (
-                      <div 
-                        key={shop.id} 
-                        onClick={() => { setSelectedCategory(shop.category || 'Food'); setSelectedShop(shop); setSearchQuery(''); }} 
-                        className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-lg cursor-pointer hover:border-amber-500/50 transition"
-                      >
-                        <img src={shop.imageUrl} alt={shop.name} className="w-12 h-12 rounded-xl object-cover border border-slate-700" />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-xs font-black text-white truncate">{shop.name}</h4>
-                          <p className="text-[10px] text-slate-400">{shop.category} • ⚡ {shop.time}</p>
-                        </div>
-                        <ChevronRight size={16} className="text-amber-400 shrink-0" />
-                      </div>
-                    ))
-                  )}
+    {/* 1. Matching Stores / Shops */}
+    <div className="space-y-2">
+      <p className="text-[10px] font-black text-slate-400 uppercase">Matching Stores ({dynamicShops.length})</p>
+      {dynamicShops.length === 0 ? (
+        <div className="text-center py-8 bg-slate-900/60 rounded-2xl border border-slate-800">
+          <p className="text-xs text-slate-400 font-bold">No shops found matching "{searchQuery}".</p>
+        </div>
+      ) : (
+        dynamicShops.map(shop => (
+          <div 
+            key={shop.id} 
+            onClick={() => { setSelectedCategory(shop.category || 'Food'); setSelectedShop(shop); setSearchQuery(''); }} 
+            className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-lg cursor-pointer hover:border-amber-500/50 transition"
+          >
+            <img src={shop.imageUrl} alt={shop.name} className="w-12 h-12 rounded-xl object-cover border border-slate-700" />
+            <div className="flex-1 min-w-0">
+              <h4 className="text-xs font-black text-white truncate">{shop.name}</h4>
+              <p className="text-[10px] text-slate-400">{shop.category} • ⚡ {shop.time}</p>
+            </div>
+            <ChevronRight size={16} className="text-amber-400 shrink-0" />
+          </div>
+        ))
+      )}
+    </div>
+
+    {/* 2. Matching Food / Grocery Items (Dishes) */}
+    <div className="space-y-2 pt-2">
+      <p className="text-[10px] font-black text-slate-400 uppercase">Matching Dishes & Items</p>
+      {(() => {
+        const matchingItems = backendFoodItems.filter(item => 
+          (item.itemName || item.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        if (matchingItems.length === 0) {
+          return (
+            <div className="text-center py-8 bg-slate-900/60 rounded-2xl border border-slate-800">
+              <p className="text-xs text-slate-400 font-bold">No dishes or items found matching "{searchQuery}".</p>
+            </div>
+          );
+        }
+
+        return matchingItems.map((item, idx) => {
+          const itemName = item.itemName || item.name || 'Item';
+          const itemPrice = item.price || 0;
+          const itemImage = item.imageUrl && item.imageUrl.trim() !== '' ? item.imageUrl : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c';
+          const cartItem = cart.find(c => c.id === (item.id || idx));
+
+          return (
+            <div key={idx} className="bg-slate-900 border border-slate-800 p-3 rounded-2xl flex items-center justify-between gap-3 shadow-lg">
+              <img src={itemImage} alt={itemName} className="w-12 h-12 rounded-xl object-cover border border-slate-700" />
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xs font-black text-white truncate">{itemName}</h4>
+                <p className="text-xs font-black text-[#fc8019]">₹{itemPrice}</p>
+              </div>
+
+              {cartItem ? (
+                <div className="flex items-center bg-gradient-to-r from-[#fc8019] to-amber-500 text-slate-950 rounded-xl px-3 py-1.5 gap-2 font-black shrink-0 text-xs shadow-md">
+                  <button onClick={() => setCart(cart.map(c => c.id === (item.id || idx) ? {...c, qty: c.qty - 1} : c).filter(c => c.qty > 0))}><Minus size={13}/></button>
+                  <span>{cartItem.qty}</span>
+                  <button onClick={() => setCart(cart.map(c => c.id === (item.id || idx) ? {...c, qty: c.qty + 1} : c))}><Plus size={13}/></button>
                 </div>
+              ) : (
+                <button 
+                  onClick={() => {
+                    setCart([...cart, { id: item.id || idx, name: itemName, price: itemPrice, qty: 1 }]);
+                    toast.success(`✓ Added ${itemName} to cart!`);
+                  }}
+                  className="bg-[#fc8019] text-slate-950 px-3.5 py-2 rounded-xl font-black text-xs cursor-pointer hover:bg-amber-400 transition"
+                >
+                  ADD +
+                </button>
               )}
+            </div>
+          );
+        });
+      })()}
+    </div>
+  </div>
+)}
 
              {activeTrackingOrder ? (
   (() => {
@@ -2153,45 +2266,54 @@ export default function CustomerApp() {
               <h3 className="text-sm font-black mt-1 text-white">Order from {activeTrackingOrder.shopName || activeTrackingOrder.shop}</h3>
               <p className="text-[10px] text-slate-400">Order ID: {activeTrackingOrder.orderId || activeTrackingOrder.id}</p>
             </div>
+          <div className="flex justify-between items-center px-1 mb-2">
+            <span className="text-[10px] text-amber-400 font-bold uppercase">📍 Shop to Customer Route</span>
+            <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/20 px-2 py-0.5 rounded-full">
+              Distance: {(() => {
+                const R = 6371; 
+                const dLat = (customerLat - shopLat) * (Math.PI / 180);
+                const dLon = (customerLng - shopLng) * (Math.PI / 180);
+                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(shopLat * (Math.PI / 180)) * Math.cos(customerLat * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                const distanceKm = R * c;
+                return distanceKm < 1 ? `${Math.round(distanceKm * 1000)} meters` : `${distanceKm.toFixed(1)} km`;
+              })()}
+            </span>
           </div>
 
-          <div className="w-full h-56 relative border-y border-slate-800">
-            <MapContainer center={[riderLocation.lat, riderLocation.lng]} zoom={15} zoomControl={false} className="w-full h-full z-10">
-              <MapUpdater center={[riderLocation.lat, riderLocation.lng]} />
+          <div className="w-full h-48 relative rounded-2xl overflow-hidden border border-slate-700">
+            <MapContainer center={[shopLat, shopLng]} zoom={13} zoomControl={false} className="w-full h-full z-10">
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               
-              <Polyline 
-                positions={[[riderLocation.lat, riderLocation.lng], [shopLat, shopLng]]} 
-                color="#fc8019" 
-                weight={4} 
-                dashArray="5, 5" 
-              />
+              {/* Shop Marker */}
+              <Marker position={[shopLat, shopLng]} />
+              
+              {/* Customer Marker */}
+              <Marker position={[customerLat, customerLng]} />
 
+              {/* Shortest Route Polyline */}
               <Polyline 
                 positions={[[shopLat, shopLng], [customerLat, customerLng]]} 
-                color="#3b82f6" 
-                weight={5} 
-              />
-
-              <Marker 
-                position={[riderLocation.lat, riderLocation.lng]} 
-                icon={getAnimatedBikeIcon(0)} 
+                color="#fc8019" 
+                weight={4} 
+                dashArray="5, 5"
               />
             </MapContainer>
-            
-            <div className="absolute top-4 right-4 bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-2xl text-center border border-emerald-400/40 backdrop-blur-md animate-pulse z-20">
-              <p className="text-lg font-black leading-none">12</p>
-              <p className="text-[9px] font-bold uppercase tracking-wider opacity-90 mt-0.5">Mins</p>
-            </div>
-
-            <div className="absolute top-4 left-4 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 px-3 py-2 rounded-2xl shadow-xl flex items-center gap-2 z-20">
-              <span className="text-base animate-bounce">🛵</span>
-              <div>
-                <p className="text-[11px] font-black text-white">Rider is on the way</p>
-                <p className="text-[9px] text-emerald-400 font-bold">{activeTrackingOrder.status || 'Out for delivery 🛵'}</p>
-              </div>
-            </div>
           </div>
+  
+  <div className="absolute top-4 right-4 bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-2xl text-center border border-emerald-400/40 backdrop-blur-md animate-pulse z-20">
+    <p className="text-lg font-black leading-none">12</p>
+    <p className="text-[9px] font-bold uppercase tracking-wider opacity-90 mt-0.5">Mins</p>
+  </div>
+
+  <div className="absolute top-4 left-4 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 px-3 py-2 rounded-2xl shadow-xl flex items-center gap-2 z-20">
+    <span className="text-base animate-bounce">🛵</span>
+    <div>
+      <p className="text-[11px] font-black text-white">Rider is on the way</p>
+      <p className="text-[9px] text-emerald-400 font-bold">{activeTrackingOrder.status || 'Out for delivery 🛵'}</p>
+    </div>
+  </div>
+</div>
 
           <div className="px-4 space-y-3">
             <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-emerald-500/30 space-y-1">
@@ -2247,11 +2369,17 @@ export default function CustomerApp() {
                 </div>
                 <div>
                   <h4 className="text-xs font-black text-white">{activeTrackingOrder.shopName || activeTrackingOrder.shop}</h4>
-                  <p className="text-[9px] text-slate-400">Shop Owner</p>
+                  <p className="text-[9px] text-slate-400">Shop Owner • <span className="text-emerald-400 font-bold">{activeTrackingOrder.shopMobile || activeTrackingOrder.shopOwnerMobile || '9876543210'}</span></p>
                 </div>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => toast.success(`📞 Calling shop...`)} className="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center shadow"><Phone size={15} /></button>
+                <a 
+                  href={`tel:${activeTrackingOrder.shopMobile || activeTrackingOrder.shopOwnerMobile || '9876543210'}`} 
+                  className="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center shadow cursor-pointer hover:bg-emerald-600/40 transition"
+                  title="Call Shop Owner"
+                >
+                  <Phone size={15} />
+                </a>
               </div>
             </div>
 
@@ -2260,11 +2388,17 @@ export default function CustomerApp() {
                 <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-base font-black text-amber-400">👨‍✈️</div>
                 <div>
                   <h4 className="text-xs font-black text-white">Delivery Partner</h4>
-                  <p className="text-[9px] text-slate-400">Assigned Driver</p>
+                  <p className="text-[9px] text-slate-400">Assigned Driver • <span className="text-emerald-400 font-bold">{activeTrackingOrder.deliveryPartnerMobile || activeTrackingOrder.driverMobile || '9876543210'}</span></p>
                 </div>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => toast.success(`📞 Calling delivery partner...`)} className="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center shadow"><Phone size={15} /></button>
+                <a 
+                  href={`tel:${activeTrackingOrder.deliveryPartnerMobile || activeTrackingOrder.driverMobile || '9876543210'}`} 
+                  className="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center shadow cursor-pointer hover:bg-emerald-600/40 transition"
+                  title="Call Delivery Partner"
+                >
+                  <Phone size={15} />
+                </a>
               </div>
             </div>
           </div>
@@ -2272,8 +2406,7 @@ export default function CustomerApp() {
       </div>
     );
   })()
-
-              ) : isPaymentScreen ? (
+) : isPaymentScreen ? (
                 <div className="space-y-3">
                   <button onClick={() => setIsPaymentScreen(false)} className="text-xs font-bold text-gray-500 flex items-center gap-1">
                     <ArrowLeft size={13} /> Back
@@ -2387,14 +2520,26 @@ export default function CustomerApp() {
 
                   <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} p-3 rounded-2xl border shadow-sm space-y-2.5`}>
                     <span className="text-[9px] font-extrabold text-gray-400 uppercase">Items</span>
-                    <div className="space-y-1.5 border-b border-gray-100 dark:border-slate-700 pb-2.5">
-                      {cart.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-xs">
-                          <span>{item.qty}x {item.name}</span>
-                          <span className="font-bold">₹{item.price * item.qty}</span>
-                        </div>
-                      ))}
-                    </div>
+                      <div className="space-y-2 border-b border-gray-100 dark:border-slate-700 pb-2.5">
+  {cart.map((item, idx) => (
+    <div key={idx} className="flex justify-between items-center text-xs gap-2">
+      <span className="flex-1 truncate font-bold">{item.name}</span>
+      
+      {/* Plus and Minus buttons for each item */}
+      <div className="flex items-center bg-[#fc8019] text-slate-950 rounded-lg px-2 py-0.5 gap-1.5 font-black shrink-0 text-xs shadow">
+        <button onClick={() => setCart(cart.map(c => c.id === item.id ? {...c, qty: c.qty - 1} : c).filter(c => c.qty > 0))}>
+          <Minus size={11} />
+        </button>
+        <span>{item.qty}</span>
+        <button onClick={() => setCart(cart.map(c => c.id === item.id ? {...c, qty: c.qty + 1} : c))}>
+          <Plus size={11} />
+        </button>
+      </div>
+
+      <span className="font-bold w-12 text-right">₹{item.price * item.qty}</span>
+    </div>
+  ))}
+</div>
 
                     <div className="space-y-1 text-xs text-gray-400">
                       <div className="flex justify-between">
@@ -2466,6 +2611,30 @@ export default function CustomerApp() {
                       </button>
                     ))}
                   </div>
+                    {/* 👇 సరిగ్గా ఇక్కడ ఆ QR కోడ్ కంటెయినర్‌ను పేస్ట్ చేయండి */}
+                 <div className={`${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900'} p-4 rounded-2xl border shadow-sm space-y-3 text-center`}>
+  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block">Scan & Pay via PhonePe / GPay (nbommali52@ybl)</span>
+  
+  <div className="bg-white p-3 rounded-2xl inline-block shadow-lg mx-auto border-2 border-amber-500">
+    <img 
+      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=nbommali52@ybl&pn=FoodieeApp&am=${totalAmount}&cu=INR`)}`} 
+      alt="Payment QR Code" 
+      className="w-36 h-36 mx-auto rounded-lg"
+      onError={(e) => {
+        // ఒకవేళ పైన ఉన్న API ఫెయిల్ అయితే, ఆల్టర్నేటివ్ Google Chart API ద్వారా QR కోడ్ లోడ్ అవ్వడానికి
+        e.target.onerror = null;
+        e.target.src = `https://chart.googleapis.com/chart?chs=180x180&cht=qr&chl=${encodeURIComponent(`upi://pay?pa=nbommali52@ybl&pn=FoodieeApp&am=${totalAmount}&cu=INR`)}`;
+      }}
+    />
+    <div className="mt-2 space-y-1 bg-amber-50 p-2 rounded-xl border border-amber-200">
+      <p className="text-[10px] font-black text-slate-900">UPI ID: mnommali52@ybl</p>
+      <p className="text-sm font-black text-emerald-600 bg-emerald-50 py-1 px-2 rounded-lg border border-emerald-200">
+        Total Amount: ₹{totalAmount}
+      </p>
+    </div>
+  </div>
+</div>
+
                 </div>
               ) : activeTab === 'favorites' ? (
                 <div className="space-y-2.5 text-xs">
@@ -2936,9 +3105,34 @@ export default function CustomerApp() {
     <button onClick={() => setCart(cart.map(c => c.id === itemId ? {...c, qty: c.qty + 1} : c))}><Plus size={13}/></button>
   </div>
 ) : (
-  <button onClick={() => setCart([...cart, { id: itemId, name: itemName, price: itemPrice, qty: 1 }])} className="bg-slate-800 hover:bg-[#fc8019] text-[#fc8019] hover:text-slate-950 border border-slate-700 px-3.5 py-2 rounded-xl font-black text-xs shrink-0 transition-all shadow-md cursor-pointer">
-    ADD +
-  </button>
+<button 
+  onClick={() => {
+    // 1. Cart lo already items unte mariyu avi verae shop nundi ayithe check cheyyali
+    if (cart.length > 0 && cart.some(item => item.shopId && item.shopId !== selectedShop.id)) {
+      if (!window.confirm("Verae shop nundi items unnayi. Vatini tholaginchi kotha shop items add cheyala?")) {
+        return;
+      }
+      setCart([]); // Old items ni clear cheyyadaniki idi mukhyam
+      setCart([{ id: itemId, name: itemName, price: itemPrice, qty: 1, shopId: selectedShop.id }]);
+      toast.success(`✓ Cart cleared & added ${itemName}!`);
+      return;
+    }
+
+    // 2. Normal ga item add chese logic
+    const existingIndex = cart.findIndex(c => c.id === itemId);
+    if (existingIndex > -1) {
+      const updated = [...cart];
+      updated[existingIndex].qty += 1;
+      setCart(updated);
+    } else {
+      setCart([...cart, { id: itemId, name: itemName, price: itemPrice, qty: 1, shopId: selectedShop.id }]);
+    }
+    toast.success(`✓ Added ${itemName} to cart!`);
+  }} 
+  className="bg-slate-800 hover:bg-[#fc8019] text-[#fc8019] hover:text-slate-950 border border-slate-700 px-3.5 py-2 rounded-xl font-black text-xs shrink-0 transition-all shadow-md cursor-pointer"
+>
+  ADD +
+</button>
 )}
                               </div>
                             );
