@@ -267,7 +267,7 @@ export default function CustomerApp() {
     }
   }, [walletBalance]);
 
-  const [paymentHistory, setPaymentHistory] = useState(() => {
+ const [paymentHistory, setPaymentHistory] = useState(() => {
     const userMob = localStorage.getItem('userMobile');
     const saved = localStorage.getItem(`foodiee_payment_history_${userMob}`);
     return saved !== null ? JSON.parse(saved) : [];
@@ -890,18 +890,21 @@ export default function CustomerApp() {
     verifyAndSavePayment(fakeTxnId, amount);
   };
 
-  const verifyAndSavePayment = async (paymentId, amount) => {
+ const verifyAndSavePayment = async (paymentId, amount) => {
     const timestamp = new Date().toLocaleString();
+    const userMob = address.mobile || phone || localStorage.getItem('userMobile');
+
     const paymentPayload = {
-      transactionId: paymentId,
-      customerMobile: address.mobile || phone || localStorage.getItem('userMobile'),
+      transactionId: paymentId || "TXN_" + Math.floor(100000 + Math.random() * 900000),
+      customerMobile: userMob,
       totalAmount: amount,
-      paymentMethod: 'Razorpay Online Top-up',
+      paymentMethod: 'Wallet Top-up (Razorpay / UPI)',
       paymentStatus: 'SUCCESS',
       shopId: selectedShop ? selectedShop.id : 1
     };
 
     try {
+      // 1. డేటాబేస్‌లో సేవ్ చేయడానికి API కాల్
       const res = await fetch(`${API_BASE_URL}/api/payments/process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -910,26 +913,34 @@ export default function CustomerApp() {
 
       if (res.ok) {
         const savedTx = await res.json();
+        
+        // 2. లోకల్ స్టేట్ మరియు లోకల్ స్టోరేజ్ అప్‌డేట్
         setWalletBalance(prev => prev + amount);
         
-        setPaymentHistory(prev => [{
+        const newRecord = {
           id: savedTx.transactionId || paymentId,
           type: 'CREDIT',
-          method: 'Wallet Top-up (Razorpay / UPI)',
+          method: 'Wallet Top-up (UPI / Razorpay)',
           amount: amount,
           date: timestamp,
           status: 'Success'
-        }, ...prev]);
+        };
 
-        toast.success(`🎉 ₹ ${amount} added to wallet successfully!`);
+        setPaymentHistory(prev => {
+          const updated = [newRecord, ...prev];
+          localStorage.setItem(`foodiee_payment_history_${userMob}`, JSON.stringify(updated));
+          return updated;
+        });
+
+        toast.success(`🎉 ₹${amount} added & saved to database successfully!`);
         setIsAddMoneyModalOpen(false);
         setAddAmountInput('');
       } else {
-        toast.error('❌ Failed to save payment in database');
+        toast.error('❌ Failed to save transaction in database');
       }
     } catch (error) {
-      console.error("Payment error:", error);
-      toast.error('❌ Server connection error');
+      console.error("Payment save error:", error);
+      toast.error('❌ Server connection error while saving payment');
     }
   };
 
@@ -2246,76 +2257,117 @@ export default function CustomerApp() {
   </div>
 )}
 
-             {activeTrackingOrder ? (
+        {activeTrackingOrder ? (
   (() => {
     const shopLat = activeTrackingOrder.shopLat || activeTrackingOrder.shop_lat || 18.5793;
     const shopLng = activeTrackingOrder.shopLng || activeTrackingOrder.shop_lng || 84.4452;
     const customerLat = activeTrackingOrder.customerLat || activeTrackingOrder.customer_lat || address.latitude || 18.5850;
     const customerLng = activeTrackingOrder.customerLng || activeTrackingOrder.customer_lng || address.longitude || 84.4520;
 
+    // Map bounds automatic ga set chese helper component
+    function MapBoundsUpdater({ shopLat, shopLng, customerLat, customerLng }) {
+      const map = useMap();
+      useEffect(() => {
+        if (shopLat && shopLng && customerLat && customerLng) {
+          const bounds = L.latLngBounds(
+            [shopLat, shopLng],
+            [customerLat, customerLng]
+          );
+          map.fitBounds(bounds, { padding: [50, 50] });
+        }
+      }, [shopLat, shopLng, customerLat, customerLng, map]);
+      return null;
+    }
+
     return (
-      <div className="space-y-3 pb-6 animate-fadeIn">
-        <button onClick={() => setActiveTrackingOrder(null)} className="text-xs font-bold text-gray-400 flex items-center gap-1 hover:text-white transition">
+      <div className="space-y-4 pb-6 animate-fadeIn">
+        <button onClick={() => setActiveTrackingOrder(null)} className="text-xs font-bold text-gray-400 flex items-center gap-1 hover:text-white transition cursor-pointer">
           <ArrowLeft size={14} /> Back to Dashboard
         </button>
 
-        <div className="bg-slate-900 border border-amber-500/30 backdrop-blur-md text-white rounded-[32px] overflow-hidden shadow-2xl space-y-4">
-          <div className="p-4 pb-2 flex justify-between items-center border-b border-slate-800">
+        <div className="bg-slate-900 border border-amber-500/30 backdrop-blur-md text-white rounded-[32px] overflow-hidden shadow-2xl space-y-4 p-4">
+          
+          <div className="flex justify-between items-center border-b border-slate-800 pb-3">
             <div>
               <span className="bg-[#fc8019]/20 text-[#fc8019] text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Live Tracking</span>
               <h3 className="text-sm font-black mt-1 text-white">Order from {activeTrackingOrder.shopName || activeTrackingOrder.shop}</h3>
               <p className="text-[10px] text-slate-400">Order ID: {activeTrackingOrder.orderId || activeTrackingOrder.id}</p>
             </div>
-          <div className="flex justify-between items-center px-1 mb-2">
-            <span className="text-[10px] text-amber-400 font-bold uppercase">📍 Shop to Customer Route</span>
-            <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/20 px-2 py-0.5 rounded-full">
-              Distance: {(() => {
-                const R = 6371; 
-                const dLat = (customerLat - shopLat) * (Math.PI / 180);
-                const dLon = (customerLng - shopLng) * (Math.PI / 180);
-                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(shopLat * (Math.PI / 180)) * Math.cos(customerLat * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                const distanceKm = R * c;
-                return distanceKm < 1 ? `${Math.round(distanceKm * 1000)} meters` : `${distanceKm.toFixed(1)} km`;
-              })()}
-            </span>
+            <div className="text-right">
+              <span className="text-xs font-black text-emerald-400 bg-emerald-500/20 px-2.5 py-1 rounded-full">
+                {(() => {
+                  const R = 6371; 
+                  const dLat = (customerLat - shopLat) * (Math.PI / 180);
+                  const dLon = (customerLng - shopLng) * (Math.PI / 180);
+                  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(shopLat * (Math.PI / 180)) * Math.cos(customerLat * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                  const distanceKm = R * c;
+                  return distanceKm < 1 ? `${Math.round(distanceKm * 1000)} meters` : `${distanceKm.toFixed(1)} km`;
+                })()}
+              </span>
+            </div>
           </div>
 
-          <div className="w-full h-48 relative rounded-2xl overflow-hidden border border-slate-700">
-            <MapContainer center={[shopLat, shopLng]} zoom={13} zoomControl={false} className="w-full h-full z-10">
+          {/* Swiggy / Zomato Style Clean Map Container with Bounds & Markers */}
+          <div className="w-full h-64 relative rounded-3xl overflow-hidden border-2 border-slate-700 shadow-2xl">
+            <MapContainer center={[shopLat, shopLng]} zoom={14} zoomControl={false} className="w-full h-full z-10">
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               
-              {/* Shop Marker */}
-              <Marker position={[shopLat, shopLng]} />
-              
-              {/* Customer Marker */}
-              <Marker position={[customerLat, customerLng]} />
-
-              {/* Shortest Route Polyline */}
-              <Polyline 
-                positions={[[shopLat, shopLng], [customerLat, customerLng]]} 
-                color="#fc8019" 
-                weight={4} 
-                dashArray="5, 5"
+              <Marker 
+                position={[shopLat, shopLng]} 
+                icon={L.divIcon({
+                  className: 'custom-shop-marker',
+                  html: `<div style="background: #1e293b; border: 2px solid #fc8019; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"><span style="font-size: 16px;">🏪</span></div>`,
+                  iconSize: [36, 36],
+                  iconAnchor: [18, 18]
+                })}
               />
+
+              <Marker 
+                position={[customerLat, customerLng]} 
+                icon={L.divIcon({
+                  className: 'custom-customer-marker',
+                  html: `<div style="background: #1e293b; border: 2px solid #10b981; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"><span style="font-size: 16px;">🏠</span></div>`,
+                  iconSize: [36, 36],
+                  iconAnchor: [18, 18]
+                })}
+              />
+
+              <Marker 
+                position={[deliveryBoyCoords.lat, deliveryBoyCoords.lng]} 
+                icon={getAnimatedBikeIcon(0)}
+              />
+
+              <Polyline 
+                positions={[
+                  [shopLat, shopLng], 
+                  [(shopLat + customerLat) / 2 + 0.002, (shopLng + customerLng) / 2 - 0.002],
+                  [customerLat, customerLng]
+                ]} 
+                color="#fc8019" 
+                weight={6} 
+                opacity={0.9}
+              />
+
+              {/* Automatic Bounds Updater to show both points */}
+              <MapBoundsUpdater shopLat={shopLat} shopLng={shopLng} customerLat={customerLat} customerLng={customerLng} />
             </MapContainer>
+
+            <div className="absolute top-3 right-3 bg-emerald-600 text-white px-3.5 py-2 rounded-2xl shadow-2xl text-center border border-emerald-400/40 backdrop-blur-md z-20">
+              <p className="text-sm font-black leading-none">12</p>
+              <p className="text-[8px] font-bold uppercase tracking-wider opacity-90 mt-0.5">Mins</p>
+            </div>
+
+            <div className="absolute top-3 left-3 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 px-3 py-1.5 rounded-2xl shadow-xl flex items-center gap-2 z-20">
+              <span className="text-sm animate-bounce">🛵</span>
+              <div>
+                <p className="text-[10px] font-black text-white">Rider is on the way</p>
+                <p className="text-[8px] text-emerald-400 font-bold">{activeTrackingOrder.status || 'Out for delivery'}</p>
+              </div>
+            </div>
           </div>
-  
-  <div className="absolute top-4 right-4 bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-2xl text-center border border-emerald-400/40 backdrop-blur-md animate-pulse z-20">
-    <p className="text-lg font-black leading-none">12</p>
-    <p className="text-[9px] font-bold uppercase tracking-wider opacity-90 mt-0.5">Mins</p>
-  </div>
 
-  <div className="absolute top-4 left-4 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 px-3 py-2 rounded-2xl shadow-xl flex items-center gap-2 z-20">
-    <span className="text-base animate-bounce">🛵</span>
-    <div>
-      <p className="text-[11px] font-black text-white">Rider is on the way</p>
-      <p className="text-[9px] text-emerald-400 font-bold">{activeTrackingOrder.status || 'Out for delivery 🛵'}</p>
-    </div>
-  </div>
-</div>
-
-          <div className="px-4 space-y-3">
+          <div className="space-y-3 pt-2">
             <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-emerald-500/30 space-y-1">
               <h4 className="text-xs font-black text-white uppercase tracking-wider">Current Status</h4>
               <span className="inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse">
@@ -2329,7 +2381,7 @@ export default function CustomerApp() {
                 {activeTrackingOrder.deliveryOtp || activeTrackingOrder.delivery_otp || '4829'}
               </h3>
               <p className="text-[10px] text-slate-400">
-                కస్టమర్ మొబైల్ నంబర్‌కి వాట్సాప్ ద్వారా OTP పంపబడింది. ఫుడ్ అందిన తర్వాతే డెలివరీ బాయ్‌కి చెప్పండి.
+                ఫుడ్ అందిన తర్వాతే డెలివరీ బాయ్‌కి ఈ OTP చెప్పండి.
               </p>
               <a 
                 href={`https://api.whatsapp.com/send?phone=91${activeTrackingOrder.customerMobile || address.mobile || phone}&text=Hello, your Foodiee Order #${activeTrackingOrder.orderId || activeTrackingOrder.id} Delivery OTP is ${activeTrackingOrder.deliveryOtp || activeTrackingOrder.delivery_otp || '4829'}`} 
@@ -2362,53 +2414,39 @@ export default function CustomerApp() {
               </button>
             </div>
 
-            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-base font-black text-amber-400">
-                  <Store size={18} />
+            {/* Shop Owner & Delivery Partner Call Cards */}
+            <div className="space-y-3 pt-2">
+              
+              {/* Delivery Partner Call Card */}
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-base font-black text-amber-400">👨‍✈️</div>
+                  <div>
+                    <h4 className="text-xs font-black text-white">
+                      {activeTrackingOrder.deliveryPartnerName || activeTrackingOrder.deliveryBoyName || activeTrackingOrder.driverName || 'Delivery Partner'}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                      Mobile: <span className="text-emerald-400">{activeTrackingOrder.deliveryPartnerMobile || activeTrackingOrder.deliveryBoyMobile || activeTrackingOrder.driverMobile || activeTrackingOrder.deliveryMobile || 'Not Assigned'}</span>
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xs font-black text-white">{activeTrackingOrder.shopName || activeTrackingOrder.shop}</h4>
-                  <p className="text-[9px] text-slate-400">Shop Owner • <span className="text-emerald-400 font-bold">{activeTrackingOrder.shopMobile || activeTrackingOrder.shopOwnerMobile || '9876543210'}</span></p>
-                </div>
-              </div>
-              <div className="flex gap-2">
                 <a 
-                  href={`tel:${activeTrackingOrder.shopMobile || activeTrackingOrder.shopOwnerMobile || '9876543210'}`} 
-                  className="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center shadow cursor-pointer hover:bg-emerald-600/40 transition"
-                  title="Call Shop Owner"
+                  href={`tel:${activeTrackingOrder.deliveryPartnerMobile || activeTrackingOrder.deliveryBoyMobile || activeTrackingOrder.driverMobile || activeTrackingOrder.deliveryMobile || ''}`} 
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 shadow cursor-pointer transition"
                 >
-                  <Phone size={15} />
+                  <Phone size={14} /> Call
                 </a>
               </div>
             </div>
 
-            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-base font-black text-amber-400">👨‍✈️</div>
-                <div>
-                  <h4 className="text-xs font-black text-white">Delivery Partner</h4>
-                  <p className="text-[9px] text-slate-400">Assigned Driver • <span className="text-emerald-400 font-bold">{activeTrackingOrder.deliveryPartnerMobile || activeTrackingOrder.driverMobile || '9876543210'}</span></p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <a 
-                  href={`tel:${activeTrackingOrder.deliveryPartnerMobile || activeTrackingOrder.driverMobile || '9876543210'}`} 
-                  className="w-9 h-9 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center shadow cursor-pointer hover:bg-emerald-600/40 transition"
-                  title="Call Delivery Partner"
-                >
-                  <Phone size={15} />
-                </a>
-              </div>
-            </div>
           </div>
         </div>
       </div>
     );
   })()
 ) : isPaymentScreen ? (
-                <div className="space-y-3">
-                  <button onClick={() => setIsPaymentScreen(false)} className="text-xs font-bold text-gray-500 flex items-center gap-1">
+  <div className="space-y-3">
+  <button onClick={() => setIsPaymentScreen(false)} className="text-xs font-bold text-gray-500 flex items-center gap-1">
                     <ArrowLeft size={13} /> Back
                   </button>
 
@@ -3200,7 +3238,28 @@ export default function CustomerApp() {
                             <button onClick={() => setActiveTrackingOrder(ord)} className="bg-gradient-to-r from-[#fc8019] to-amber-500 text-slate-950 px-3 py-1.5 rounded-xl font-black flex items-center gap-1 shadow-md">
                               <span>🛵 Track</span>
                             </button>
-                            <button onClick={() => setRatingModal(ord.id)} className="bg-slate-700 text-amber-400 px-2.5 py-1 rounded-bold">Rate</button>
+                            {/* 👇 Rate బటన్ పక్కనే 'Re-Order' బటన్ */}
+         {/* Re-Order Button */}
+<button 
+  onClick={() => {
+    // 1. Order lo unna items ni parse chesi cart loki load cheyadam
+    // Or direct ga ord.items ni cart items ga set cheyadam
+    const reorderItems = [{
+      id: Date.now(),
+      name: ord.items,
+      price: ord.totalAmount || ord.total,
+      qty: 1,
+      shopId: ord.shopId || 1
+    }];
+    
+    setCart(reorderItems);
+    setIsPaymentScreen(true); // Direct ga payment page/screen ki redirect avthundi
+    toast.success(`✓ Re-order items loaded! Please complete payment.`);
+  }} 
+  className="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-xl font-black text-[10px] shadow cursor-pointer"
+>
+  🔄 Re-Order
+</button>
                           </div>
                         </div>
                       </div>
