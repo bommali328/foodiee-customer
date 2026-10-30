@@ -12,7 +12,6 @@ export default function App() {
       }
     });
 
-   
     // 2. టోకెన్ సక్సెస్ ఫుల్ గా జనరేట్ అయినప్పుడు బ్యాక్‌ఎండ్‌కి పంపడం
     PushNotifications.addListener('registration', async (token) => {
       console.log('Native Push Registration Token:', token.value);
@@ -45,17 +44,22 @@ export default function App() {
       }
     });
 
-    // 3. యాప్ రన్నింగ్‌లో ఉన్నప్పుడు (Foreground) నోటిఫికేషన్ వస్తే
+   // 3. యాప్ రన్నింగ్‌లో ఉన్నప్పుడు (Foreground) నోటిఫికేషన్ వస్తే
     PushNotifications.addListener('pushNotificationReceived', async (notification) => {
       console.log('Push notification received: ', notification);
       
-      // మొబైల్ స్క్రీన్ పై లోకల్ నోటిఫికేషన్ లాగా చూపించడానికి
+      // బ్యాక్‌ఎండ్ నుండి data లో లేదా notification లో వచ్చే ఇమేజ్ URL ని క్యాప్చర్ చేయడం
+      const imageUrl = notification.data?.image || notification.data?.imageUrl || notification.notification?.image;
+
+      // మొబైల్ స్క్రీన్ పై లోకల్ నోటిఫికేషన్ లాగా చూపించడం (Swiggy/Flipkart Style)
       await LocalNotifications.schedule({
         notifications: [
           {
-            title: notification.title || 'Foodiee',
+            title: notification.title || 'Foodiee Special Offer',
             body: notification.body || 'New update regarding your order!',
             id: new Date().getTime(),
+            largeIcon: imageUrl, // 👈 నోటిఫికేషన్‌లో ఇమేజ్ ప్రివ్యూ చూపించడానికి
+            summaryText: 'Foodiee Notification',
             sound: undefined,
             extra: notification.data
           }

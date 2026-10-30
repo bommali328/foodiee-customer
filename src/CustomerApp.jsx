@@ -156,36 +156,37 @@ export default function CustomerApp() {
     if (!userMob) return;
 
     const registerNativePush = async () => {
-      try {
-        // 🌟 ఇది కేవలం నేటివ్ ఆండ్రాయిడ్/ఐఓఎస్ లో మాత్రమే రన్ అవుతుంది
-        if (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform()) {
-          let permResult = await PushNotifications.checkPermissions();
-          if (permResult.receive === 'prompt') {
-            permResult = await PushNotifications.requestPermissions();
-          }
-          
-          if (permResult.receive === 'granted') {
-            await PushNotifications.register();
-            
-            PushNotifications.addListener('registration', async (token) => {
-              console.log('Native Push Registration Token:', token.value);
-              if (userMob && token.value) {
-                await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ mobile: userMob, fcmToken: token.value })
-                });
-                console.log("FCM Token successfully synced to database!");
-              }
-            });
-          }
-        } else {
-          console.log("Running on Web Browser. PushNotifications plugin skipped.");
+  try {
+    // 🌟 వెబ్ బ్రౌజర్ అయితే వెంటనే బయటికి వచ్చేయడానికి
+    if (typeof Capacitor === 'undefined' || !Capacitor.isNativePlatform()) {
+      console.log("Running on Web Browser. PushNotifications plugin skipped.");
+      return;
+    }
+
+    let permResult = await PushNotifications.checkPermissions();
+    if (permResult.receive === 'prompt') {
+      permResult = await PushNotifications.requestPermissions();
+    }
+    
+    if (permResult.receive === 'granted') {
+      await PushNotifications.register();
+      
+      PushNotifications.addListener('registration', async (token) => {
+        console.log('Native Push Registration Token:', token.value);
+        if (userMob && token.value) {
+          await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile: userMob, fcmToken: token.value })
+          });
+          console.log("FCM Token successfully synced to database!");
         }
-      } catch (error) {
-        console.log("Push notifications not supported in this environment.");
-      }
-    };
+      });
+    }
+  } catch (error) {
+    console.log("Push notifications not supported in this environment:", error);
+  }
+};
 
     registerNativePush();
   }, [phone, isLoggedIn]);
@@ -499,8 +500,11 @@ export default function CustomerApp() {
     };
 
     fetchInitialData();
-  }, [phone]);
 
+    // ✅ ప్రతి 3 సెకన్లకు ఒకసారి షాప్స్ మరియు ఐటెమ్స్ స్టేటస్ ఆటోమేటిక్‌గా సింక్ అవుతుంది
+    const liveSyncInterval = setInterval(fetchInitialData, 3000);
+    return () => clearInterval(liveSyncInterval);
+  }, [phone]);
   useEffect(() => {
     if (!selectedShop || !selectedShop.id) return;
     
@@ -803,7 +807,7 @@ export default function CustomerApp() {
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [editableAddress, setEditableAddress] = useState(address);
 
-  const detectLiveGpsLocation = () => {
+ const detectLiveGpsLocation = () => {
     if (!navigator.geolocation) {
       toast.error('❌ మీ బ్రౌజర్ లొకేషన్‌ను సపోర్ట్ చేయడం లేదు');
       return;
@@ -813,8 +817,16 @@ export default function CustomerApp() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
+        let lat = position.coords.latitude;
+        let lng = position.coords.longitude;
+
+        // ✅ ఇచ్ఛాపురం చుట్టుపక్కల ల్యాండ్ ఏరియా కోఆర్డినేట్స్ వాలిడేషన్ (సముద్రంలో / తప్పు లొకేషన్‌లో పడకుండా ఉండటానికి)
+        if (lat < 18.0 || lat > 19.0 || lng < 84.0 || lng > 85.0) {
+          lat = 18.5793; // డిఫాల్ట్ ఇచ్ఛాపురం లాటిట్యూడ్
+          lng = 84.4452; // డిఫాల్ట్ ఇచ్ఛాపురం లాంగిట్యూడ్
+          toast.error('⚠️ జీపీఎస్ లొకేషన్ సరిహద్దు దాటడంతో డిఫాల్ట్ ఇచ్ఛాపురం లొకేషన్ సెట్ చేయబడింది.');
+        }
+
         setAddress(prev => ({
           ...prev,
           latitude: lat,
@@ -959,36 +971,47 @@ export default function CustomerApp() {
   const totalAmount = Math.max(0, ((subtotal + deliveryFee) + riderTip) - discount);
   const splitAmount = (totalAmount / Math.max(1, splitPeople)).toFixed(2);
 
-  const applyPromo = () => {
+ const applyPromo = async () => {
     if (!promoCode.trim()) {
       setDiscount(0);
+      toast.error('❌ దయచేసి కూపన్ కోడ్ ఎంటర్ చేయండి');
       return;
     }
 
-    const usedPromos = JSON.parse(localStorage.getItem('foodiee_used_promos') || '[]');
-    if (usedPromos.includes(promoCode.toUpperCase())) {
-      toast.error(`❌ Coupon ${promoCode.toUpperCase()} already used! Valid only once per customer.`);
-      setDiscount(0);
-      return;
-    }
-
-    const matched = availablePromos.find(p => p.code.toUpperCase() === promoCode.toUpperCase());
-    
-    if (matched) {
-      let numericDiscount = 0;
-      const rawDiscount = String(matched.discount || '');
+    try {
+      // ✅ బ్యాక్‌ఎండ్ డేటాబేస్ API కి రిక్వెస్ట్ పంపడం (వన్-టైమ్ యూజ్ చెకింగ్ కోసం)
+      const response = await fetch(`${API_BASE_URL}/api/promos/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ 
+        code: promoCode.trim(),
+        mobile: address.mobile || phone || localStorage.getItem('userMobile') // 👈 మొబైల్ నంబర్ పంపడం
+    })
+});
       
-      if (rawDiscount.includes('₹')) {
-        numericDiscount = parseFloat(rawDiscount.replace(/[^0-9.]/g, '')) || 0;
-      } else if (!isNaN(rawDiscount)) {
-        numericDiscount = parseFloat(rawDiscount) || 0;
-      }
+      const data = await response.json();
 
-      setDiscount(numericDiscount);
-      toast.success(`🎁 Promo code ${matched.code} applied successfully!`);
-    } else {
+      if (response.ok) {
+        let numericDiscount = 0;
+        const rawDiscount = String(data.discount || '');
+        
+        if (rawDiscount.includes('₹')) {
+          numericDiscount = parseFloat(rawDiscount.replace(/[^0-9.]/g, '')) || 0;
+        } else if (!isNaN(rawDiscount)) {
+          numericDiscount = parseFloat(rawDiscount) || 0;
+        }
+
+        setDiscount(numericDiscount);
+        toast.success(`🎁 ${data.message || 'కూపన్ విజయవంతంగా అప్లై అయింది!'}`);
+      } else {
+        // ❌ కూపన్ ఇప్పటికే వాడేసి ఉంటే బ్యాక్‌ఎండ్ ఇచ్చే ఎర్రర్ మెసేజ్ ఇక్కడ టోస్ట్ రూపంలో వస్తుంది
+        setDiscount(0);
+        toast.error(data.error || '❌ కూపన్ అప్లై చేయడం విఫలమైంది');
+      }
+    } catch (err) {
+      console.error("Promo error:", err);
       setDiscount(0);
-      toast.error('❌ Invalid Promo Code');
+      toast.error('❌ నెట్‌వర్క్ ఎర్రర్ ఏర్పడింది');
     }
   };
 
@@ -1220,7 +1243,7 @@ export default function CustomerApp() {
         categoriesMap[cat].push(item);
       });
 
-      return {
+     return {
         id: shop.id,
         name: shop.shopName || shop.name || 'Local Store', 
         imageUrl: (shop.imageUrl && shop.imageUrl.trim() !== '') ? shop.imageUrl : 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5',
@@ -1229,6 +1252,7 @@ export default function CustomerApp() {
         time: shop.deliveryTime || '15 mins',
         category: shop.category || shop.shopCategory || 'Store',
         address: shop.address || 'Main Road, Ichapuram',
+        shopOpen: shop.shopOpen !== false && shop.isOpen !== false, // ✅ షాప్ స్టేటస్ సింక్ అవ్వడానికి ఇది ముఖ్యం
         categories: categoriesMap,
         items: shopItems
       };
@@ -2665,7 +2689,7 @@ export default function CustomerApp() {
       }}
     />
     <div className="mt-2 space-y-1 bg-amber-50 p-2 rounded-xl border border-amber-200">
-      <p className="text-[10px] font-black text-slate-900">UPI ID: mnommali52@ybl</p>
+      <p className="text-[10px] font-black text-slate-900">UPI ID: nbommali52@ybl</p>
       <p className="text-sm font-black text-emerald-600 bg-emerald-50 py-1 px-2 rounded-lg border border-emerald-200">
         Total Amount: ₹{totalAmount}
       </p>
@@ -3042,10 +3066,10 @@ export default function CustomerApp() {
     
     {/* 👇 ఇక్కడ ఈ కోడ్ పేస్ట్ చేయాలి */}
     {shop.shopOpen === false && (
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-20">
-            <span className="bg-rose-500 text-white font-black px-3 py-1.5 rounded-full text-xs uppercase shadow-lg">Shop Closed ❌</span>
-        </div>
-    )}
+    <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-20">
+        <span className="bg-rose-500 text-white font-black px-3 py-1.5 rounded-full text-xs uppercase shadow-lg">Shop Closed ❌</span>
+    </div>
+)}
     
     <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-10">
         <span className="bg-slate-950/80 backdrop-blur-md text-amber-400 border border-amber-500/30 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">
