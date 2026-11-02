@@ -3122,6 +3122,14 @@ export default function CustomerApp() {
                   </button>
 
                   <ShopBannerSlider selectedShop={selectedShop} />
+                  {/* 👇 షాప్ క్లోజ్ అయినప్పుడు కస్టమర్‌కి కనిపించే వార్నింగ్ బ్యానర్ ఇక్కడ యాడ్ చేయండి */}
+    {selectedShop.shopOpen === false && (
+      <div className="bg-rose-500/15 border border-rose-500/40 text-rose-400 p-3 rounded-2xl text-center text-xs font-bold mb-3 shadow-md animate-pulse">
+        🔴 ఈ షాప్ ప్రస్తుతం మూసివేయబడింది (Shop Closed). మీరు ఐటెమ్స్ చూడవచ్చు కానీ ఆర్డర్ చేయడానికి వీలులేదు.
+      </div>
+    )}
+
+                  
 
                   {Object.keys(selectedShop.categories).length === 0 ? (
                     <div className="text-center py-16 space-y-2">
@@ -3160,6 +3168,10 @@ export default function CustomerApp() {
   <button disabled className="bg-slate-800 text-rose-400 border border-rose-500/30 px-3 py-2 rounded-xl font-bold text-[10px] cursor-not-allowed opacity-75">
     Out of Stock ❌
   </button>
+) : selectedShop.shopOpen === false ? (
+  <button disabled className="bg-slate-800 text-slate-500 border border-slate-700 px-3.5 py-2 rounded-xl font-black text-[10px] cursor-not-allowed">
+    Closed ❌
+  </button>
 ) : cartItem ? (
   <div className="flex items-center bg-gradient-to-r from-[#fc8019] to-amber-500 text-slate-950 rounded-xl px-3 py-1.5 gap-2 font-black shrink-0 text-xs shadow-md">
     <button onClick={() => setCart(cart.map(c => c.id === itemId ? {...c, qty: c.qty - 1} : c).filter(c => c.qty > 0))}><Minus size={13}/></button>
@@ -3169,6 +3181,12 @@ export default function CustomerApp() {
 ) : (
 <button 
   onClick={() => {
+    // 0. Shop close unna check chesi alert ivvadaniki
+    if (selectedShop.shopOpen === false) {
+      toast.error('❌ Shop closed undi! Ee samayamlo orders accept cheyyabadavu.');
+      return;
+    }
+
     // 1. Cart lo already items unte mariyu avi verae shop nundi ayithe check cheyyali
     if (cart.length > 0 && cart.some(item => item.shopId && item.shopId !== selectedShop.id)) {
       if (!window.confirm("Verae shop nundi items unnayi. Vatini tholaginchi kotha shop items add cheyala?")) {
@@ -3196,6 +3214,7 @@ export default function CustomerApp() {
   ADD +
 </button>
 )}
+
                               </div>
                             );
                           })}
