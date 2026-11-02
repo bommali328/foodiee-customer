@@ -1252,7 +1252,7 @@ export default function CustomerApp() {
         time: shop.deliveryTime || '15 mins',
         category: shop.category || shop.shopCategory || 'Store',
         address: shop.address || 'Main Road, Ichapuram',
-        shopOpen: shop.shopOpen !== false && shop.isOpen !== false, // ✅ షాప్ స్టేటస్ సింక్ అవ్వడానికి ఇది ముఖ్యం
+        shopOpen: shop.shopOpen === true || shop.isOpen === true || shop.shop_open === true || (shop.shopOpen !== false && shop.isOpen !== false && shop.status !== 'Store Temporarily Closed'),
         categories: categoriesMap,
         items: shopItems
       };
