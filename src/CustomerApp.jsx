@@ -134,7 +134,17 @@ const calculateDeliveryTime = (lat1, lon1, lat2, lon2) => {
 };
 export default function CustomerApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem('userMobile') ? true : false;
+    const savedMobile = localStorage.getItem('userMobile');
+    const isInstalledBefore = localStorage.getItem('foodiee_app_installed');
+    
+    // Oka vela app uninstall chesi malli vesthe, local storage reset avvali
+    if (!isInstalledBefore) {
+      localStorage.clear();
+      localStorage.setItem('foodiee_app_installed', 'true');
+      return false;
+    }
+    
+    return savedMobile ? true : false;
   });
 
   const [authMode, setAuthMode] = useState('login');
@@ -1252,7 +1262,7 @@ export default function CustomerApp() {
         time: shop.deliveryTime || '15 mins',
         category: shop.category || shop.shopCategory || 'Store',
         address: shop.address || 'Main Road, Ichapuram',
-        shopOpen: shop.shopOpen === true || shop.isOpen === true || shop.shop_open === true || (shop.shopOpen !== false && shop.isOpen !== false && shop.status !== 'Store Temporarily Closed'),
+        shopOpen: shop.shopOpen === true || shop.isOpen === true || shop.shop_open === true || shop.status === 'Open & Accepting Orders',
         categories: categoriesMap,
         items: shopItems
       };
@@ -2001,27 +2011,31 @@ export default function CustomerApp() {
                   </div>
 
                   <div className="pt-2 pb-6 shrink-0 border-t border-gray-200 dark:border-slate-700 mt-auto">
-                    <button 
-                      onClick={() => { 
-                        localStorage.removeItem('userMobile'); 
-                        localStorage.removeItem('userName'); 
-                        localStorage.removeItem('foodiee_wallet_balance');
-                        localStorage.removeItem('foodiee_payment_history');
-                        localStorage.removeItem('foodiee_saved_scratch_cards');
-                        localStorage.removeItem('foodiee_active_address');
-                        localStorage.removeItem('foodiee_multiple_addresses');
-                        localStorage.removeItem('foodiee_seen_promos');
-                        setIsLoggedIn(false); 
-                        setPhone('');
-                        setPassword('');
-                        setIsDrawerOpen(false);
-                        toast.success('✓ Logged out successfully');
-                      }} 
-                      className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-3.5 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
-                    >
-                      <LogOut size={12} /> Logout from Foodiee
-                    </button>
-                  </div>
+    <button 
+      onClick={() => { 
+        localStorage.removeItem('userMobile'); 
+        localStorage.removeItem('userName'); 
+        localStorage.removeItem('foodiee_wallet_balance');
+        localStorage.removeItem('foodiee_payment_history');
+        localStorage.removeItem('foodiee_saved_scratch_cards');
+        localStorage.removeItem('foodiee_active_address');
+        localStorage.removeItem('foodiee_multiple_addresses');
+        localStorage.removeItem('foodiee_seen_promos');
+        
+        // 👇 యాప్ అన్‌ఇన్‌స్టాల్ లాజిక్ కోసం ఇది చాలా ముఖ్యం
+        localStorage.setItem('foodiee_app_installed', 'true');
+        
+        setIsLoggedIn(false); 
+        setPhone('');
+        setPassword('');
+        setIsDrawerOpen(false);
+        toast.success('✓ Logged out successfully');
+      }} 
+      className="w-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 py-3.5 rounded-2xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+    >
+      <LogOut size={12} /> Logout from Foodiee
+    </button>
+</div>
                 </div>
                 <div className="flex-1 bg-black/40" onClick={() => setIsDrawerOpen(false)}></div>
               </div>
@@ -3100,15 +3114,15 @@ export default function CustomerApp() {
                            
                           
 
-                            <div className="px-4 py-3 bg-slate-950/60 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                              <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">
-                                {shop.category || selectedCategory} • Open Now
-                              </span>
-                              <div className="flex items-center gap-1 text-[#fc8019] font-black group-hover:translate-x-1 transition-transform">
-                                <span>Explore Menu</span>
-                                <ChevronRight size={14} />
-                              </div>
-                            </div>
+                            <div className="px-4 py-3 bg-slate-950/80 border-t border-slate-800/80 flex items-center justify-between text-[11px] relative z-20">
+  <span className={`text-[10px] font-bold uppercase tracking-wider ${shop.shopOpen === false ? 'text-rose-400' : 'text-emerald-400'}`}>
+    {shop.shopOpen === false ? '🔴 Closed • Opens at 9:00 AM' : '🟢 FOOD • OPEN NOW'}
+  </span>
+  <div className="flex items-center gap-1 text-[#fc8019] font-black">
+    <span>Explore Menu</span>
+    <ChevronRight size={14} />
+  </div>
+</div>
                           </div>
                         ))
                     )}
