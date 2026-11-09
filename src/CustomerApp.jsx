@@ -1099,23 +1099,23 @@ export default function CustomerApp() {
 
     const currentCustomerName = address.name || localStorage.getItem('userName') || name || 'Customer';
 
-    const newOrderPayload = {
-      customerName: currentCustomerName,
-      customerMobile: address.mobile || phone || localStorage.getItem('userMobile'),
-      deliveryAddress: `${address.houseNo ? address.houseNo + ', ' : ''}${address.street}, ${address.landmark ? 'Near ' + address.landmark + ', ' : ''}${address.district}, ${address.state} - ${address.pincode}`,
-      shopName: selectedShop ? selectedShop.name : 'Local Store',
-      shopId: selectedShop ? selectedShop.id : 1,
-      items: orderItemsDesc,
-      totalAmount: totalAmount,
-      deliveryFee: deliveryFee,
-      paymentMethod: methodName,
-      status: 'Pending Approval',
-      shopLat: selectedShop?.lat || 18.5793,
-      shopLng: selectedShop?.lng || 84.4452,
-      customerLat: address.latitude || 18.5793,
-      customerLng: address.longitude || 84.4452,
-      orderTime: new Date().toISOString()
-    };
+   const newOrderPayload = {
+    customerName: currentCustomerName,
+    customerMobile: address.mobile || phone || localStorage.getItem('userMobile'),
+    deliveryAddress: `${address.houseNo ? address.houseNo + ', ' : ''}${address.street}, ${address.landmark ? 'Near ' + address.landmark + ', ' : ''}${address.district}, ${address.state} - ${address.pincode}`,
+    shopName: selectedShop ? selectedShop.name : 'Local Store',
+    shopId: selectedShop ? selectedShop.id : 1,
+    items: orderItemsDesc,
+    totalAmount: totalAmount,
+    deliveryFee: deliveryFee,
+    paymentMethod: methodName,
+    status: 'Pending Approval',
+    shopLat: selectedShop?.lat || 18.5793,
+    shopLng: selectedShop?.lng || 84.4452,
+    customerLat: address.latitude || 18.5793,
+    customerLng: address.longitude || 84.4452,
+    orderTime: new Date().toISOString()
+  };
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/orders/place`, {
@@ -1613,11 +1613,40 @@ export default function CustomerApp() {
                       const userData = responseData.data || responseData;
                       const userMobileNum = userData.mobile || phone;
 
+                      // 🌟 1. ముందస్తుగా ఉన్న పాత యూజర్ సెషన్ లేదా లోకల్ స్టోరేజ్ క్లియర్ చేయడం
+                      localStorage.clear();
+                      localStorage.setItem('foodiee_app_installed', 'true');
+
                       const fetchedName = userData.name && userData.name.trim() !== '' ? userData.name : 'User';
+                      
+                      // 🌟 2. కొత్త యూజర్ మొబైల్ మరియు పేరు సెట్ చేయడం
                       localStorage.setItem('userMobile', userMobileNum);
                       localStorage.setItem('userName', fetchedName);
-                      setAddress(prev => ({ ...prev, name: fetchedName }));
-                      
+                      setAddress(prev => ({ ...prev, name: fetchedName, mobile: userMobileNum }));
+
+                      // 🌟 3. నేటివ్ / వెబ్ పుష్ నోటిఫికేషన్ FCM టోకెన్‌ని కొత్త నంబర్‌తో డేటాబేస్‌కి సింక్ చేయడం
+                      try {
+                        if (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform()) {
+                          const permResult = await PushNotifications.checkPermissions();
+                          if (permResult.receive === 'granted') {
+                            await PushNotifications.register();
+                          }
+                        }
+                        
+                        // బ్యాక్‌ఎండ్ సర్వర్‌కి FCM టోకెన్ అప్‌డేట్ చేయుటకు API కాల్
+                        await fetch(`${API_BASE_URL}/api/customers/update-fcm-token`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ 
+                            mobile: userMobileNum, 
+                            fcmToken: localStorage.getItem('fcm_token') || 'active_token_' + userMobileNum 
+                          })
+                        });
+                      } catch (e) {
+                        console.log("FCM token sync warning during login:", e);
+                      }
+
+                      // 🌟 4. వాలెట్ బ్యాలెన్స్ మరియు హిస్టరీ లోడ్ చేయడం
                       const previousBalance = userData.walletBalance !== undefined ? parseFloat(userData.walletBalance) : 0.00;
                       localStorage.setItem(`foodiee_wallet_balance_${userMobileNum}`, previousBalance);
                       setWalletBalance(previousBalance);
@@ -1625,6 +1654,8 @@ export default function CustomerApp() {
                       if (userData.paymentHistory) {
                           localStorage.setItem(`foodiee_payment_history_${userMobileNum}`, JSON.stringify(userData.paymentHistory));
                           setPaymentHistory(userData.paymentHistory);
+                      } else {
+                          setPaymentHistory([]);
                       }
 
                       if (userData.scratchCards) {
@@ -1635,10 +1666,13 @@ export default function CustomerApp() {
                           setScratchCards(savedCards ? JSON.parse(savedCards) : []);
                       }
 
+                      // 🌟 5. కొత్త యూజర్ యొక్క ఆర్డర్ హిస్టరీ ఫెచ్ చేయడం
                       const orderRes = await fetch(`${API_BASE_URL}/api/orders/customer/${userMobileNum}`);
                       if (orderRes.ok) {
                           const orderData = await orderRes.json();
                           setBackendOrders(orderData);
+                      } else {
+                          setBackendOrders([]);
                       }
 
                       setAddress(prev => ({ ...prev, name: fetchedName, mobile: userMobileNum }));
