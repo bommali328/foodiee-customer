@@ -816,6 +816,52 @@ export default function CustomerApp() {
 
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [editableAddress, setEditableAddress] = useState(address);
+  // 🔍 పిన్ కోడ్ లేదా ఏరియా పేరు బట్టి ఆటోమేటిక్‌గా Lat/Lng తెచ్చుకునే ఫంక్షన్
+ const handleSearchLocationByText = async (searchText) => {
+    if (!searchText || searchText.trim() === "") {
+      toast.error('❌ దయచేసి పిన్ కోడ్ లేదా ఏరియా పేరు ఎంటర్ చేయండి');
+      return;
+    }
+
+    toast.loading('🔍 లొకేషన్ వెతుకుతోంది...');
+
+    try {
+      // ✅ పిన్ కోడ్ మాత్రమే ఇస్తే, దానికి ఆటోమేటిక్‌గా ఇచ్ఛాపురం జోడించబడుతుంది
+      let query = searchText.trim();
+      if (/^\d{6}$/.test(query)) {
+        query = `${query}, Ichapuram, India`;
+      } else {
+        query = `${query}, Ichapuram, India`;
+      }
+
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+
+      toast.dismiss();
+
+      if (data && data.length > 0) {
+        const bestMatch = data[0];
+        const newLat = parseFloat(bestMatch.lat);
+        const newLng = parseFloat(bestMatch.lon);
+        const displayName = bestMatch.display_name;
+
+        setEditableAddress(prev => ({
+          ...prev,
+          street: displayName,
+          latitude: newLat,
+          longitude: newLng,
+          pincode: searchText.length === 6 ? searchText : prev.pincode
+        }));
+
+        toast.success(`📍 లొకేషన్ దొరికింది: ${newLat.toFixed(4)}, ${newLng.toFixed(4)}`);
+      } else {
+        toast.error('❌ ఆ పిన్ కోడ్ లేదా లొకేషన్ దొరకలేదు. దయచేసి ఏరియా పేరు లేదా సరిైన పిన్ కోడ్ ఇవ్వండి.');
+      }
+    } catch (error) {
+      toast.dismiss();
+      toast.error('❌ నెట్‌వర్క్ ఎర్రర్ ఏర్పడింది.');
+    }
+  };
 
  const detectLiveGpsLocation = () => {
     if (!navigator.geolocation) {
@@ -975,8 +1021,29 @@ export default function CustomerApp() {
 
   const [searchQuery, setSearchQuery] = useState('');
 
+ // 📏 రెండు పాయింట్ల మధ్య దూరం కనుగొనే జావాస్క్రిప్ట్ ఫంక్షన్
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // కిలోమీటర్లలో భూమి వ్యాసార్థం
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // కిలోమీటర్లలో దూరం
+  };
+
   const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
-  const deliveryFee = subtotal > 0 ? 20 : 0;
+  
+  // 💰 దూరం బట్టి డెలివరీ ఫీజు లెక్కించడం (2 కి.మీ వరకు ₹20, ఆపై ప్రతి కిమీకి ₹10 అదనం)
+  const shopLat = selectedShop?.lat || selectedShop?.latitude || 18.5793;
+  const shopLng = selectedShop?.lng || selectedShop?.longitude || 84.4452;
+  const custLat = address.latitude || 18.5793;
+  const custLng = address.longitude || 84.4452;
+
+  const distanceKm = calculateDistance(shopLat, shopLng, custLat, custLng);
+  const deliveryFee = subtotal > 0 ? (distanceKm <= 2 ? 20 : Math.round(20 + (distanceKm - 2) * 10)) : 0;
   
   const totalAmount = Math.max(0, ((subtotal + deliveryFee) + riderTip) - discount);
   const splitAmount = (totalAmount / Math.max(1, splitPeople)).toFixed(2);
@@ -2509,41 +2576,84 @@ export default function CustomerApp() {
                           <p className="text-xs text-orange-400 font-bold">⚠️ No delivery address set. Click 'Edit / GPS 📍' to add one.</p>
                         )}
                       </div>
-                    ) : (
-                      <form onSubmit={handleSaveEditedAddress} className="space-y-2 pt-1 border-t border-slate-700 text-xs">
-                        <div className="flex gap-2">
-                          <button type="button" onClick={detectLiveGpsLocation} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 shadow cursor-pointer">
-                            <Navigation size={12} /> Detect Live GPS Coordinates
-                          </button>
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-slate-400 font-bold uppercase">Customer Name</label>
-                          <input type="text" value={editableAddress.name || ''} onChange={(e) => setEditableAddress({...editableAddress, name: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-slate-400 font-bold uppercase">Flat/House No</label>
-                          <input type="text" value={editableAddress.houseNo || ''} onChange={(e) => setEditableAddress({...editableAddress, houseNo: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" />
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-slate-400 font-bold uppercase">Apartment / Area</label>
-                          <input type="text" value={editableAddress.street || ''} onChange={(e) => setEditableAddress({...editableAddress, street: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-slate-400 font-bold uppercase">Landmark</label>
-                          <input type="text" value={editableAddress.landmark || ''} onChange={(e) => setEditableAddress({...editableAddress, landmark: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" />
-                        </div>
-                        <div className="flex gap-2">
-                          <div className="flex-1">
-                            <label className="text-[9px] text-slate-400 font-bold uppercase">District</label>
-                            <input type="text" value={editableAddress.district || ''} onChange={(e) => setEditableAddress({...editableAddress, district: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
-                          </div>
-                          <div className="w-24">
-                            <label className="text-[9px] text-slate-400 font-bold uppercase">Pincode</label>
-                            <input type="text" value={editableAddress.pincode || ''} onChange={(e) => setEditableAddress({...editableAddress, pincode: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
-                          </div>
-                        </div>
-                        <button type="submit" className="w-full bg-[#fc8019] text-slate-950 py-2 rounded-xl font-black text-xs shadow cursor-pointer">Save Address & Name</button>
-                      </form>
+                   ) : (
+                     <form onSubmit={handleSaveEditedAddress} className="space-y-2.5 pt-1 border-t border-slate-700 text-xs">
+  
+  {/* 👇 పిన్ కోడ్ లేదా ఏరియా పేరు టైప్ చేసి సెర్చ్ చేసే బాక్స్ */}
+  <div className="space-y-1 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+    <label className="text-[9px] text-amber-400 font-bold uppercase">Search by Pincode or Area Name</label>
+    <div className="flex gap-2">
+      <input 
+        type="text" 
+        id="searchAreaInput"
+        placeholder="ఉదా: 532312 లేదా Ichapuram" 
+        className="flex-1 bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none"
+      />
+      <button 
+        type="button" 
+        onClick={() => {
+          const val = document.getElementById('searchAreaInput').value;
+          handleSearchLocationByText(val);
+        }}
+        className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-2 rounded-xl text-xs font-black cursor-pointer shadow"
+      >
+        Search 🔍
+      </button>
+    </div>
+  </div>
+
+  <div className="flex gap-2">
+    <button type="button" onClick={detectLiveGpsLocation} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 shadow cursor-pointer">
+      <Navigation size={12} /> Detect Live GPS
+    </button>
+  </div>
+
+  <div>
+    <label className="text-[9px] text-slate-400 font-bold uppercase">Customer Name</label>
+    <input type="text" value={editableAddress.name || ''} onChange={(e) => setEditableAddress({...editableAddress, name: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
+  </div>
+
+  <div>
+    <label className="text-[9px] text-slate-400 font-bold uppercase">Flat/House No</label>
+    <input type="text" value={editableAddress.houseNo || ''} onChange={(e) => setEditableAddress({...editableAddress, houseNo: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" />
+  </div>
+
+  <div>
+    <label className="text-[9px] text-slate-400 font-bold uppercase">Apartment / Area / Street</label>
+    <input type="text" value={editableAddress.street || ''} onChange={(e) => setEditableAddress({...editableAddress, street: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
+  </div>
+
+  <div>
+    <label className="text-[9px] text-slate-400 font-bold uppercase">Landmark</label>
+    <input type="text" value={editableAddress.landmark || ''} onChange={(e) => setEditableAddress({...editableAddress, landmark: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" />
+  </div>
+
+  <div className="flex gap-2">
+    <div className="flex-1">
+      <label className="text-[9px] text-slate-400 font-bold uppercase">District</label>
+      <input type="text" value={editableAddress.district || ''} onChange={(e) => setEditableAddress({...editableAddress, district: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
+    </div>
+    <div className="w-24">
+      <label className="text-[9px] text-slate-400 font-bold uppercase">Pincode</label>
+      <input type="text" value={editableAddress.pincode || ''} onChange={(e) => setEditableAddress({...editableAddress, pincode: e.target.value})} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-xl text-xs font-bold text-white outline-none mt-0.5" required />
+    </div>
+  </div>
+
+  {/* 👇 మ్యాన్యువల్‌గా లేదా సెర్చ్ ద్వారా వచ్చే లాటిట్యూడ్ మరియు లాంగిట్యూడ్ */}
+  <div className="flex gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+    <div className="flex-1">
+      <label className="text-[9px] text-amber-400 font-bold uppercase">Latitude (Lat)</label>
+      <input type="number" step="any" value={editableAddress.latitude || ''} onChange={(e) => setEditableAddress({...editableAddress, latitude: parseFloat(e.target.value)})} className="w-full bg-slate-900 border border-slate-700 p-1.5 rounded-lg text-xs font-bold text-amber-300 outline-none mt-0.5" placeholder="18.5793" />
+    </div>
+    <div className="flex-1">
+      <label className="text-[9px] text-amber-400 font-bold uppercase">Longitude (Lng)</label>
+      <input type="number" step="any" value={editableAddress.longitude || ''} onChange={(e) => setEditableAddress({...editableAddress, longitude: parseFloat(e.target.value)})} className="w-full bg-slate-900 border border-slate-700 p-1.5 rounded-lg text-xs font-bold text-amber-300 outline-none mt-0.5" placeholder="84.4452" />
+    </div>
+  </div>
+
+  <button type="submit" className="w-full bg-[#fc8019] text-slate-950 py-2.5 rounded-xl font-black text-xs shadow cursor-pointer mt-1">Save Address & GPS</button>
+</form>
+                    
                     )}
                   </div>
 
