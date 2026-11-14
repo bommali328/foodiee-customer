@@ -2369,6 +2369,13 @@ export default function CustomerApp() {
               <div className="flex-1 min-w-0">
                 <h4 className="text-xs font-black text-white truncate">{itemName}</h4>
                 <p className="text-xs font-black text-[#fc8019]">₹{itemPrice}</p>
+
+                {/* 🌟 ఐటెమ్ డిస్క్రిప్షన్ ఇక్కడ కస్టమర్‌కి కనిపిస్తుంది */}
+                 {item.description && (
+               <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+              {item.description}
+                </p>
+                )}
               </div>
 
               {cartItem ? (
@@ -3319,6 +3326,12 @@ export default function CustomerApp() {
                                 <div className="flex-1 min-w-0 space-y-1">
                                   <p className="font-black text-xs text-white truncate">{itemName}</p>
                                   <p className="text-[#fc8019] font-black text-xs">₹{itemPrice}</p>
+                                  {/* 🌟 ఐటెమ్ డిస్క్రిప్షన్ ఇక్కడ కస్టమర్‌కి కనిపిస్తుంది */}
+                                 {item.description && (
+                                  <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                                {item.description}
+                                   </p>
+                                 )}
                                   <span className="text-[9px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md font-bold">Fresh & Tasty</span>
                                 </div>
 
