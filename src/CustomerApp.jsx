@@ -3335,7 +3335,7 @@ export default function CustomerApp() {
                                   <span className="text-[9px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md font-bold">Fresh & Tasty</span>
                                 </div>
 
-                               {item.available === false ? (
+                              {item.available === false ? (
   <button disabled className="bg-slate-800 text-rose-400 border border-rose-500/30 px-3 py-2 rounded-xl font-bold text-[10px] cursor-not-allowed opacity-75">
     Out of Stock ❌
   </button>
@@ -3350,40 +3350,39 @@ export default function CustomerApp() {
     <button onClick={() => setCart(cart.map(c => c.id === itemId ? {...c, qty: c.qty + 1} : c))}><Plus size={13}/></button>
   </div>
 ) : (
-<button 
-  onClick={() => {
-    // 0. Shop close unna check chesi alert ivvadaniki
-    if (selectedShop.shopOpen === false) {
-      toast.error('❌ Shop closed undi! Ee samayamlo orders accept cheyyabadavu.');
-      return;
-    }
-
-    // 1. Cart lo already items unte mariyu avi verae shop nundi ayithe check cheyyali
-    if (cart.length > 0 && cart.some(item => item.shopId && item.shopId !== selectedShop.id)) {
-      if (!window.confirm("Verae shop nundi items unnayi. Vatini tholaginchi kotha shop items add cheyala?")) {
+  <button 
+    onClick={() => {
+      // 0. Shop close unna check chesi alert ivvadaniki
+      if (selectedShop.shopOpen === false) {
+        toast.error('❌ Shop closed undi! Ee samayamlo orders accept cheyyabadavu.');
         return;
       }
-      setCart([]); // Old items ni clear cheyyadaniki idi mukhyam
-      setCart([{ id: itemId, name: itemName, price: itemPrice, qty: 1, shopId: selectedShop.id }]);
-      toast.success(`✓ Cart cleared & added ${itemName}!`);
-      return;
-    }
 
-    // 2. Normal ga item add chese logic
-    const existingIndex = cart.findIndex(c => c.id === itemId);
-    if (existingIndex > -1) {
-      const updated = [...cart];
-      updated[existingIndex].qty += 1;
-      setCart(updated);
-    } else {
-      setCart([...cart, { id: itemId, name: itemName, price: itemPrice, qty: 1, shopId: selectedShop.id }]);
-    }
-    toast.success(`✓ Added ${itemName} to cart!`);
-  }} 
-  className="bg-slate-800 hover:bg-[#fc8019] text-[#fc8019] hover:text-slate-950 border border-slate-700 px-3.5 py-2 rounded-xl font-black text-xs shrink-0 transition-all shadow-md cursor-pointer"
->
-  ADD +
-</button>
+      // 1. Cart lo already items unte mariyu avi verae shop nundi ayithe check cheyyali
+      if (cart.length > 0 && cart.some(cartItemObj => cartItemObj.shopId && cartItemObj.shopId !== selectedShop.id)) {
+        if (!window.confirm("Verae shop nundi items unnayi. Vatini tholaginchi kotha shop items add cheyala?")) {
+          return;
+        }
+        setCart([{ id: itemId, name: itemName, price: itemPrice, qty: 1, shopId: selectedShop.id }]);
+        toast.success(`✓ Cart cleared & added ${itemName}!`);
+        return;
+      }
+
+      // 2. Normal ga item add chese logic
+      const existingIndex = cart.findIndex(c => c.id === itemId);
+      if (existingIndex > -1) {
+        const updated = [...cart];
+        updated[existingIndex].qty += 1;
+        setCart(updated);
+      } else {
+        setCart([...cart, { id: itemId, name: itemName, price: itemPrice, qty: 1, shopId: selectedShop.id }]);
+      }
+      toast.success(`✓ Added ${itemName} to cart!`);
+    }} 
+    className="bg-slate-800 hover:bg-[#fc8019] text-[#fc8019] hover:text-slate-950 border border-slate-700 px-3.5 py-2 rounded-xl font-black text-xs shrink-0 transition-all shadow-md cursor-pointer"
+  >
+    ADD +
+  </button>
 )}
 
                               </div>
