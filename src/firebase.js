@@ -39,6 +39,17 @@ export const requestCustomerNotificationPermission = async (customerMobile) => {
         // నోటిఫికేషన్ రిసీవ్ అయినప్పుడు (లాక్ స్క్రీన్/హోమ్ స్క్రీన్ కోసం)
         PushNotifications.addListener('pushNotificationReceived', (notification) => {
           console.log('Push notification received: ', notification);
+          
+          // 🌟 నోటిఫికేషన్‌లో ఇమేజ్ లేదా డేటా వస్తే కన్సోల్‌లో ప్రింట్ చేసి హ్యాండ్ చేయడం
+          const notificationData = notification.data;
+          if (notificationData && notificationData.image) {
+            console.log('Notification Banner Image URL:', notificationData.image);
+          }
+        });
+
+        // నోటిఫికేషన్ మీద క్లిక్ చేసినప్పుడు యాక్షన్స్
+        PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+          console.log('Push notification action performed: ', action);
         });
       }
     } else {
