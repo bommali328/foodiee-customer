@@ -582,19 +582,37 @@ export default function CustomerApp() {
           }
         });
 
-        stompClient.subscribe(`/topic/order/status/${activeTrackingOrder.id || activeTrackingOrder.orderId}`, (message) => {
+       stompClient.subscribe(`/topic/order/status/${activeTrackingOrder.id || activeTrackingOrder.orderId}`, (message) => {
           const newStatus = message.body;
           setActiveTrackingOrder(prev => ({ ...prev, status: newStatus }));
           toast.success(`📦 Order Status Updated: ${newStatus}`);
-          showNativeNotification("Order Status Update 📦", `Your order status changed to: ${newStatus}`);
+
+          // 🌟 కలర్‌ఫుల్ మరియు స్టైలిష్ నోటిఫికేషన్
+          const notificationTitle = "🔥 𝙁𝙤𝙤𝙙𝙞𝙚𝙚 • 𝗔𝗿𝗿𝗶𝘃𝗶𝗻𝗴 𝗦𝗵𝗼𝗿𝘁𝗹𝘆";
+          const notificationOptions = {
+              body: `🍕 Your order status changed to: ${newStatus}! Tap to track 🛵`,
+              icon: logo,
+              badge: logo,
+              vibrate: [200, 100, 200]
+          };
+
+          if ("Notification" in window && Notification.permission === "granted") {
+              new Notification(notificationTitle, notificationOptions);
+          } else if ("Notification" in window && Notification.permission !== "denied") {
+              Notification.requestPermission().then(permission => {
+                  if (permission === "granted") {
+                      new Notification(notificationTitle, notificationOptions);
+                  }
+              });
+          }
         });
       },
     });
 
     stompClient.activate();
     return () => stompClient.deactivate();
-  }, [activeTrackingOrder?.id]);
-
+  }, [activeTrackingOrder?.id]); 
+  
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
