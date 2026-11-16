@@ -14,6 +14,7 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 
 
+
 // ✅ BASE URL UPDATE (AWS)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.foodiee.shop";
 
