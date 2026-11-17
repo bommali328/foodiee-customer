@@ -1286,7 +1286,7 @@ export default function CustomerApp() {
     }
   };
 
- const dynamicShops = allShops
+  const dynamicShops = allShops
     .filter(shop => {
       const rawCat = shop.category || shop.shopCategory || shop.type || '';
       const shopCat = rawCat.toUpperCase();
@@ -1309,8 +1309,8 @@ export default function CustomerApp() {
 
       if (!targetCat || targetCat === 'ALL') return true;
 
-      if (targetCat.includes('SWEETS') || targetCat.includes('SNACKS')) {
-        return shopCat.includes('SWEET') || shopCat.includes('SNACK') || shopCat.includes('CONFECTIONERY');
+      if (targetCat.includes('MEAT') || targetCat.includes('FISH')) {
+        return shopCat.includes('MEAT') || shopCat.includes('CHICKEN') || shopCat.includes('MUTTON') || shopCat.includes('FISH');
       }
       if (targetCat.includes('GROCERY')) {
         return shopCat.includes('GROCERY') || shopCat.includes('STORE') || shopCat.includes('SUPERMARKET') || (shop.shopName || shop.name || '').toUpperCase().includes('GROCERY');
@@ -1326,13 +1326,6 @@ export default function CustomerApp() {
       if (quickFilter.includes('Fast Delivery')) return true;
       if (quickFilter.includes('Top Rated')) return (parseFloat(shop.rating) || 4.8) >= 4.7;
       return true;
-    })
-    .sort((a, b) => {
-      // 🟢 ఓపెన్ ఉన్న షాప్స్ ఎప్పుడూ పైకి, 🔴 క్లోజ్ అయిన షాప్స్ కిందకి (Down) వెళ్లేలా సార్టింగ్
-      const aOpen = a.shopOpen === true || a.isOpen === true || a.shop_open === true || a.status === 'Open & Accepting Orders';
-      const bOpen = b.shopOpen === true || b.isOpen === true || b.shop_open === true || b.status === 'Open & Accepting Orders';
-      
-      return (bOpen === true) - (aOpen === true);
     })
     .map(shop => {
       const shopItems = backendFoodItems.filter(item =>
@@ -3082,22 +3075,23 @@ export default function CustomerApp() {
       accent: 'bg-white shadow-[0_0_12px_#ffffff]'
       }
     ].map(cat => (
-    <button 
-      key={cat.name} 
-      onClick={() => setSelectedCategory(cat.name)} 
-      className={`relative group overflow-hidden border-2 p-4 rounded-[30px] flex flex-col items-center text-center hover:-translate-y-2 transition-all duration-300 cursor-pointer backdrop-blur-2xl ${
-        darkMode ? cat.darkBg : cat.lightBg
-      }`}
-    >
-      <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+      <button 
+        key={cat.name} 
+        onClick={() => setSelectedCategory(cat.name)} 
+        className={`relative group overflow-hidden border-2 p-4 rounded-[30px] flex flex-col items-center text-center hover:-translate-y-2 transition-all duration-300 cursor-pointer backdrop-blur-2xl ${
+          darkMode ? cat.darkBg : cat.lightBg
+        }`}
+      >
+        <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
 
-      <div className="w-14 h-14 rounded-2xl bg-white/95 dark:bg-slate-900/90 shadow-lg flex items-center justify-center text-2xl mb-2 group-hover:scale-110 transition-transform duration-300 border border-white/40">
-        {cat.icon}
-      </div>
-      <span className="text-xs font-black tracking-tight drop-shadow-sm">{cat.name}</span>
-      <div className={`w-5 h-1.5 rounded-full ${cat.accent} mt-2 group-hover:w-10 transition-all duration-300`}></div>
-    </button>
-  ))}
+        <div className="w-14 h-14 rounded-2xl bg-white/95 dark:bg-slate-900/90 shadow-lg flex items-center justify-center text-2xl mb-2 group-hover:scale-110 transition-transform duration-300 border border-white/40">
+          {cat.icon}
+        </div>
+        <span className="text-xs font-black tracking-tight drop-shadow-sm">{cat.name}</span>
+        <div className={`w-5 h-1.5 rounded-full ${cat.accent} mt-2 group-hover:w-10 transition-all duration-300`}></div>
+      </button>
+    ))}
+  </div>
 </div>
 
                   <div className="flex gap-2 overflow-x-auto pb-1 pt-1">
