@@ -1286,7 +1286,7 @@ export default function CustomerApp() {
     }
   };
 
-  const dynamicShops = allShops
+ const dynamicShops = allShops
     .filter(shop => {
       const rawCat = shop.category || shop.shopCategory || shop.type || '';
       const shopCat = rawCat.toUpperCase();
@@ -1309,8 +1309,8 @@ export default function CustomerApp() {
 
       if (!targetCat || targetCat === 'ALL') return true;
 
-      if (targetCat.includes('MEAT') || targetCat.includes('FISH')) {
-        return shopCat.includes('MEAT') || shopCat.includes('CHICKEN') || shopCat.includes('MUTTON') || shopCat.includes('FISH');
+      if (targetCat.includes('SWEETS') || targetCat.includes('SNACKS')) {
+        return shopCat.includes('SWEET') || shopCat.includes('SNACK') || shopCat.includes('CONFECTIONERY');
       }
       if (targetCat.includes('GROCERY')) {
         return shopCat.includes('GROCERY') || shopCat.includes('STORE') || shopCat.includes('SUPERMARKET') || (shop.shopName || shop.name || '').toUpperCase().includes('GROCERY');
@@ -1326,6 +1326,13 @@ export default function CustomerApp() {
       if (quickFilter.includes('Fast Delivery')) return true;
       if (quickFilter.includes('Top Rated')) return (parseFloat(shop.rating) || 4.8) >= 4.7;
       return true;
+    })
+    .sort((a, b) => {
+      // 🟢 ఓపెన్ ఉన్న షాప్స్ ఎప్పుడూ పైకి, 🔴 క్లోజ్ అయిన షాప్స్ కిందకి (Down) వెళ్లేలా సార్టింగ్
+      const aOpen = a.shopOpen === true || a.isOpen === true || a.shop_open === true || a.status === 'Open & Accepting Orders';
+      const bOpen = b.shopOpen === true || b.isOpen === true || b.shop_open === true || b.status === 'Open & Accepting Orders';
+      
+      return (bOpen === true) - (aOpen === true);
     })
     .map(shop => {
       const shopItems = backendFoodItems.filter(item =>
