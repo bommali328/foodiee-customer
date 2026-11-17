@@ -18,6 +18,8 @@ import { PushNotifications } from '@capacitor/push-notifications';
 // ✅ BASE URL UPDATE (AWS)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.foodiee.shop";
 
+
+
 // --- CUSTOM ANIMATED BIKE ICON FOR LEAFLET MAP ---
 const getAnimatedBikeIcon = (rotationAngle) => {
   return new L.DivIcon({
@@ -3065,12 +3067,12 @@ export default function CustomerApp() {
         accent: 'bg-white shadow-[0_0_12px_#ffffff]' 
       },
       { 
-        name: 'Meat & Fish', 
-        icon: '🥩', 
-        desc: 'Chicken, Mutton & Fish', 
-        lightBg: 'bg-gradient-to-br from-rose-400 via-pink-400 to-rose-500 border-rose-500 text-slate-950 shadow-xl shadow-rose-500/30', 
-        darkBg: 'bg-gradient-to-br from-rose-500 via-pink-600 to-rose-700 border-rose-300 text-white shadow-[0_0_25px_rgba(244,63,94,0.5)]', 
-        accent: 'bg-white shadow-[0_0_12px_#ffffff]' 
+        name: 'Sweets & Snacks', 
+      icon: '🍬', 
+      desc: 'Traditional Sweets & Snacks', 
+      lightBg: 'bg-gradient-to-br from-amber-300 via-yellow-400 to-orange-400 border-amber-400 text-slate-950 shadow-xl shadow-amber-400/30', 
+      darkBg: 'bg-gradient-to-br from-amber-600 via-yellow-600 to-orange-700 border-amber-400 text-white shadow-[0_0_25px_rgba(251,191,36,0.5)]', 
+      accent: 'bg-white shadow-[0_0_12px_#ffffff]'
       }
     ].map(cat => (
       <button 
