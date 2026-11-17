@@ -3070,28 +3070,27 @@ export default function CustomerApp() {
         name: 'Sweets & Snacks', 
       icon: '🍬', 
       desc: 'Traditional Sweets & Snacks', 
-      lightBg: 'bg-gradient-to-br from-amber-300 via-yellow-400 to-orange-400 border-amber-400 text-slate-950 shadow-xl shadow-amber-400/30', 
-      darkBg: 'bg-gradient-to-br from-amber-600 via-yellow-600 to-orange-700 border-amber-400 text-white shadow-[0_0_25px_rgba(251,191,36,0.5)]', 
+      lightBg: 'bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-500 border-yellow-400 text-slate-950 shadow-xl shadow-yellow-500/40', 
+      darkBg: 'bg-gradient-to-br from-yellow-500 via-amber-600 to-yellow-700 border-yellow-300 text-white shadow-[0_0_25px_rgba(234,179,8,0.6)]', 
       accent: 'bg-white shadow-[0_0_12px_#ffffff]'
       }
     ].map(cat => (
-      <button 
-        key={cat.name} 
-        onClick={() => setSelectedCategory(cat.name)} 
-        className={`relative group overflow-hidden border-2 p-4 rounded-[30px] flex flex-col items-center text-center hover:-translate-y-2 transition-all duration-300 cursor-pointer backdrop-blur-2xl ${
-          darkMode ? cat.darkBg : cat.lightBg
-        }`}
-      >
-        <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+    <button 
+      key={cat.name} 
+      onClick={() => setSelectedCategory(cat.name)} 
+      className={`relative group overflow-hidden border-2 p-4 rounded-[30px] flex flex-col items-center text-center hover:-translate-y-2 transition-all duration-300 cursor-pointer backdrop-blur-2xl ${
+        darkMode ? cat.darkBg : cat.lightBg
+      }`}
+    >
+      <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
 
-        <div className="w-14 h-14 rounded-2xl bg-white/95 dark:bg-slate-900/90 shadow-lg flex items-center justify-center text-2xl mb-2 group-hover:scale-110 transition-transform duration-300 border border-white/40">
-          {cat.icon}
-        </div>
-        <span className="text-xs font-black tracking-tight drop-shadow-sm">{cat.name}</span>
-        <div className={`w-5 h-1.5 rounded-full ${cat.accent} mt-2 group-hover:w-10 transition-all duration-300`}></div>
-      </button>
-    ))}
-  </div>
+      <div className="w-14 h-14 rounded-2xl bg-white/95 dark:bg-slate-900/90 shadow-lg flex items-center justify-center text-2xl mb-2 group-hover:scale-110 transition-transform duration-300 border border-white/40">
+        {cat.icon}
+      </div>
+      <span className="text-xs font-black tracking-tight drop-shadow-sm">{cat.name}</span>
+      <div className={`w-5 h-1.5 rounded-full ${cat.accent} mt-2 group-hover:w-10 transition-all duration-300`}></div>
+    </button>
+  ))}
 </div>
 
                   <div className="flex gap-2 overflow-x-auto pb-1 pt-1">
