@@ -15,6 +15,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
 
 
 
+
 // ✅ BASE URL UPDATE (AWS)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.foodiee.shop";
 
@@ -155,7 +156,8 @@ export default function CustomerApp() {
   const [showNotificationModal, setShowNotificationModal] = useState(false);
 
   const [unreadSupportCount, setUnreadSupportCount] = useState(0); 
-  const [unreadOrderCount, setUnreadOrderCount] = useState(0); 
+  const [unreadOrderCount, setUnreadOrderCount] = useState(0);
+  const [useWalletBalance, setUseWalletBalance] = useState(false); 
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -244,6 +246,7 @@ export default function CustomerApp() {
     { code: 'FIRST20', discount: '₹20 OFF', minOrder: 199, isActive: true }
   ]);
   const [promoPopup, setPromoPopup] = useState(null);
+  
 
   const [notifications, setNotifications] = useState([
     { id: 1, title: '⚡ Flash Offer Added!', desc: 'Use code FIRST50 for ₹50 OFF on your first food order.', time: 'Just now', unread: true },
@@ -267,6 +270,38 @@ export default function CustomerApp() {
       localStorage.setItem(`foodiee_saved_scratch_cards_${userMob}`, JSON.stringify(scratchCards));
     }
   }, [scratchCards]);
+  // ✅ మొబైల్ నంబర్ ఆధారంగా డేటాబేస్ నుండి వాలెట్ మరియు ట్రాన్సాక్షన్ సింక్ చేయడం
+  const fetchWalletFromDatabase = async () => {
+    const userMob = phone || localStorage.getItem('userMobile');
+    if (!userMob) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/wallet/${userMob}`);
+      if (response.ok) {
+        const data = await response.json();
+        setWalletBalance(data.walletBalance || 0.0);
+        
+        if (data.transactions && Array.isArray(data.transactions)) {
+          const formattedTxns = data.transactions.map((t, idx) => ({
+            id: "TXN_" + (idx + 100),
+            type: t.includes('Added') || t.includes('Credit') ? 'CREDIT' : 'DEBIT',
+            method: t,
+            amount: 0,
+            date: new Date().toLocaleString(),
+            status: 'Success'
+          }));
+          setPaymentHistory(formattedTxns);
+        }
+        localStorage.setItem(`foodiee_wallet_balance_${userMob}`, data.walletBalance);
+      }
+    } catch (err) {
+      console.error("Failed to fetch wallet data from database", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchWalletFromDatabase();
+  }, [phone, isLoggedIn]);
 
   const [walletBalance, setWalletBalance] = useState(() => {
     const userMob = localStorage.getItem('userMobile');
@@ -309,12 +344,32 @@ export default function CustomerApp() {
   }, []);
 
   // Request device permissions (Location & Camera)
-  useEffect(() => {
+ useEffect(() => {
     const requestDevicePermissions = async () => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-          (position) => { console.log("Location granted"); },
-          (error) => { console.log("Location error:", error.message); }
+          (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            // 🌟 లైవ్ జీపీఎస్ కోఆర్డినేట్లను అడ్రస్ స్టేట్స్‌లో అప్‌డేట్ చేయడం
+            setAddress(prev => ({
+              ...prev,
+              latitude: lat,
+              longitude: lng,
+              street: prev.street ? prev.street : `Live GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+            }));
+            
+            setNewAddressInput(prev => ({
+              ...prev,
+              latitude: lat,
+              longitude: lng
+            }));
+
+            console.log("Location granted:", lat, lng);
+          },
+          (error) => { console.log("Location error:", error.message); },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
       }
       try {
@@ -740,10 +795,12 @@ export default function CustomerApp() {
       district: '',
       state: '',
       pincode: '',
-      latitude: 18.5793,
-      longitude: 84.4452
+      latitude: '',
+      longitude: ''
     };
   });
+
+  const [isAddressDropdownOpen, setIsAddressDropdownOpen] = useState(false);
 
   const [newAddressInput, setNewAddressInput] = useState({
     type: 'Home',
@@ -755,8 +812,8 @@ export default function CustomerApp() {
     district: '',
     state: '',
     pincode: '',
-    latitude: 18.5793,
-    longitude: 84.4452
+    latitude: '',
+    longitude: ''
   });
 
   const detectGpsForNewAddress = () => {
@@ -788,10 +845,10 @@ export default function CustomerApp() {
     );
   };
 
-  const handleAddNewAddress = async (e) => {
+ const handleAddNewAddress = async (e) => {
     e.preventDefault();
     if (!newAddressInput.street.trim() || !newAddressInput.pincode.trim() || !newAddressInput.district.trim()) {
-      toast.error('❌ Please fill complete address details');
+      toast.error('❌ దయచేసి పూర్తి అడ్రస్ వివరాలను నింపండి');
       return;
     }
 
@@ -801,6 +858,7 @@ export default function CustomerApp() {
     };
 
     try {
+      // 🌟 డేటాబేస్ / బ్యాక్‌ఎండ్ సర్వర్‌కి అడ్రస్ పంపడం
       const response = await fetch(`${API_BASE_URL}/api/address/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -811,8 +869,9 @@ export default function CustomerApp() {
         const savedAddr = await response.json();
         setSavedAddresses(prev => [...prev, savedAddr]);
         setAddress(savedAddr);
-        toast.success(`📍 ${newAddressInput.type} Complete Address Saved to Database with GPS!`);
+        toast.success(`📍 ${newAddressInput.type} అడ్రస్ GPS తో సహా విజయవంతంగా సేవ్ అయింది!`);
         
+        // ఇన్పుట్ ఫీల్డ్స్ రీసెట్ చేయడం
         setNewAddressInput({ 
           type: 'Home', 
           name: address.name, 
@@ -823,15 +882,15 @@ export default function CustomerApp() {
           district: '', 
           state: '', 
           pincode: '', 
-          latitude: 18.5793, 
-          longitude: 84.4452 
+          latitude: '', 
+          longitude: '' 
         });
       } else {
-        toast.error('❌ Failed to save address in database');
+        toast.error('❌ అడ్రస్ సేవ్ చేయడం విఫలమైంది');
       }
     } catch (error) {
       console.error("Address save error:", error);
-      toast.error('❌ Network error while saving address');
+      toast.error('❌ నెట్‌వర్క్ ఎర్రర్ ఏర్పడింది');
     }
   };
 
@@ -884,40 +943,53 @@ export default function CustomerApp() {
     }
   };
 
- const detectLiveGpsLocation = () => {
+const detectLiveGpsLocation = () => {
+    // 1. బ్రౌజర్ జియోలొకేషన్ సపోర్ట్ చేస్తుందో లేదో చెక్ చేయడం
     if (!navigator.geolocation) {
       toast.error('❌ మీ బ్రౌజర్ లొకేషన్‌ను సపోర్ట్ చేయడం లేదు');
       return;
     }
 
-    toast.loading('📍 లైవ్ లొకేషన్ డిటెక్ట్ చేస్తోంది...');
+    toast.loading('📍 జీపీఎస్ పర్మిషన్ కోరుతోంది... దయచేసి Allow ఇవ్వండి.');
 
+    // 2. బ్రౌజర్ ద్వారా పర్మిషన్ అడిగి కరెంట్ పొజిషన్ తీసుకోవడం (ఏ ప్రాంతంలో ఉన్నా సరే)
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        let lat = position.coords.latitude;
-        let lng = position.coords.longitude;
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
 
-        // ✅ ఇచ్ఛాపురం చుట్టుపక్కల ల్యాండ్ ఏరియా కోఆర్డినేట్స్ వాలిడేషన్ (సముద్రంలో / తప్పు లొకేషన్‌లో పడకుండా ఉండటానికి)
-        if (lat < 18.0 || lat > 19.0 || lng < 84.0 || lng > 85.0) {
-          lat = 18.5793; // డిఫాల్ట్ ఇచ్ఛాపురం లాటిట్యూడ్
-          lng = 84.4452; // డిఫాల్ట్ ఇచ్ఛాపురం లాంగిట్యూడ్
-          toast.error('⚠️ జీపీఎస్ లొకేషన్ సరిహద్దు దాటడంతో డిఫాల్ట్ ఇచ్ఛాపురం లొకేషన్ సెట్ చేయబడింది.');
-        }
-
+        // ✅ ఎలాంటి సరిహద్దు ఆంక్షలు లేకుండా కస్టమర్ ఉన్న రియల్ లొకేషన్‌ను నేరుగా సెట్ చేయడం
         setAddress(prev => ({
           ...prev,
           latitude: lat,
           longitude: lng,
-          street: prev.street ? prev.street : `GPS Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+          street: prev.street ? prev.street : `Live GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`
         }));
+        
+        setEditableAddress(prev => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+          street: prev.street ? prev.street : `Live GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+        }));
+
         toast.dismiss();
-        toast.success('📍 లొకేషన్ విజయవంతంగా క్యాప్చర్ చేయబడింది!');
+        toast.success(`📍 జీపీఎస్ పర్మిషన్ విజయవంతం! లొకేషన్ క్యాప్చర్ అయింది.`);
       },
       (error) => {
         toast.dismiss();
-        toast.error('❌ లొకేషన్ పర్మిషన్ నిరాకరించబడింది లేదా అందుబాటులో లేదు.');
+        // యూజర్ ఒకవేళ 'Block' లేదా 'Deny' నొక్కితే వచ్చే ఎర్రర్ హ్యాండ్లింగ్
+        if (error.code === error.PERMISSION_DENIED) {
+          toast.error('❌ మీరు లొకేషన్ పర్మిషన్‌ను నిరాకరించారు. దయచేసి బ్రౌజర్ సెట్టింగ్స్‌లో పర్మిషన్ ఇవ్వండి.');
+        } else {
+          toast.error('❌ లొకేషన్ దొరకలేదు. దయచేసి మ్యాన్యువల్‌గా అడ్రస్ ఎంటర్ చేయండి.');
+        }
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { 
+        enableHighAccuracy: true, 
+        timeout: 15000, 
+        maximumAge: 0 
+      }
     );
   };
 
@@ -935,7 +1007,6 @@ export default function CustomerApp() {
   useEffect(() => {
     localStorage.setItem('foodiee_active_address', JSON.stringify(address));
   }, [address]);
-
   const [isAddMoneyModalOpen, setIsAddMoneyModalOpen] = useState(false);
   const [addAmountInput, setAddAmountInput] = useState('');
 
@@ -982,32 +1053,28 @@ export default function CustomerApp() {
  const verifyAndSavePayment = async (paymentId, amount) => {
     const timestamp = new Date().toLocaleString();
     const userMob = address.mobile || phone || localStorage.getItem('userMobile');
-
-    const paymentPayload = {
-      transactionId: paymentId || "TXN_" + Math.floor(100000 + Math.random() * 900000),
-      customerMobile: userMob,
-      totalAmount: amount,
-      paymentMethod: 'Wallet Top-up (Razorpay / UPI)',
-      paymentStatus: 'SUCCESS',
-      shopId: selectedShop ? selectedShop.id : 1
-    };
+    const txnDetail = `Added ₹${amount} via UPI/Razorpay on ${timestamp}`;
 
     try {
-      // 1. డేటాబేస్‌లో సేవ్ చేయడానికి API కాల్
-      const res = await fetch(`${API_BASE_URL}/api/payments/process`, {
+      // 1. స్ప్రింగ్ బూట్ వాలెట్ అప్‌డేట్ ఏపీఐకి కాల్ చేయడం
+      const res = await fetch(`${API_BASE_URL}/api/wallet/update`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(paymentPayload),
+        body: JSON.stringify({
+          mobile: userMob,
+          amount: Number(amount),
+          transactionDetails: txnDetail
+        }),
       });
 
       if (res.ok) {
-        const savedTx = await res.json();
+        const updatedWallet = await res.json();
         
-        // 2. లోకల్ స్టేట్ మరియు లోకల్ స్టోరేజ్ అప్‌డేట్
-        setWalletBalance(prev => prev + amount);
+        // 2. డేటాబేస్ నుండి వచ్చిన లేటెస్ట్ వాలెట్ బ్యాలెన్స్‌ని సెట్ చేయడం
+        setWalletBalance(updatedWallet.walletBalance || 0.0);
         
         const newRecord = {
-          id: savedTx.transactionId || paymentId,
+          id: paymentId || "TXN_" + Math.floor(100000 + Math.random() * 900000),
           type: 'CREDIT',
           method: 'Wallet Top-up (UPI / Razorpay)',
           amount: amount,
@@ -1021,18 +1088,17 @@ export default function CustomerApp() {
           return updated;
         });
 
-        toast.success(`🎉 ₹${amount} added & saved to database successfully!`);
+        toast.success(`🎉 ₹${amount} successfully added & synced to database!`);
         setIsAddMoneyModalOpen(false);
         setAddAmountInput('');
       } else {
-        toast.error('❌ Failed to save transaction in database');
+        toast.error('❌ Failed to update wallet in database');
       }
     } catch (error) {
-      console.error("Payment save error:", error);
-      toast.error('❌ Server connection error while saving payment');
+      console.error("Wallet sync error:", error);
+      toast.error('❌ Server connection error while updating wallet');
     }
   };
-
   const [favorites, setFavorites] = useState([]);
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -1042,8 +1108,11 @@ export default function CustomerApp() {
 
   const [searchQuery, setSearchQuery] = useState('');
 
- // 📏 రెండు పాయింట్ల మధ్య దూరం కనుగొనే జావాస్క్రిప్ట్ ఫంక్షన్
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const subtotal = cart.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 0)), 0);
+
+  // 🛒 1. కార్ట్ లో ఉన్న ఐటమ్స్ బట్టి subtotal లెక్కించడం (ఇది ముందుండాలి)
+ const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
     const R = 6371; // కిలోమీటర్లలో భూమి వ్యాసార్థం
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
@@ -1052,22 +1121,38 @@ export default function CustomerApp() {
       Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // కిలోమీటర్లలో దూరం
+    return R * c; 
   };
+  const shopLat = Number(selectedShop?.lat || selectedShop?.latitude || 19.1120);
+  const shopLng = Number(selectedShop?.lng || selectedShop?.longitude || 84.6850);
+  const custLat = Number(address.latitude || 19.1120);
+  const custLng = Number(address.longitude || 19.1120);
 
-  const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
-  
-  // 💰 దూరం బట్టి డెలివరీ ఫీజు లెక్కించడం (2 కి.మీ వరకు ₹20, ఆపై ప్రతి కిమీకి ₹10 అదనం)
-  const shopLat = selectedShop?.lat || selectedShop?.latitude || 18.5793;
-  const shopLng = selectedShop?.lng || selectedShop?.longitude || 84.4452;
-  const custLat = address.latitude || 18.5793;
-  const custLng = address.longitude || 84.4452;
+  // దూరం లెక్కించడం
+  let distanceKm = (shopLat && shopLng && custLat && custLng) 
+    ? calculateDistance(shopLat, shopLng, custLat, custLng) 
+    : 2.0;
 
-  const distanceKm = calculateDistance(shopLat, shopLng, custLat, custLng);
-  const deliveryFee = subtotal > 0 ? (distanceKm <= 2 ? 20 : Math.round(20 + (distanceKm - 2) * 10)) : 0;
+    if (distanceKm > 50 || isNaN(distanceKm)) {
+    distanceKm = 2.5; 
+  }
+
+  // 🌟 4. మొదటి ఆర్డర్ అయితే ఫ్రీ డెలివరీ (₹0), లేదంటే దూరం బట్టి ఫీజు (2 కి.మీ వరకు ₹20, ఆపై ప్రతి కిమీకి ₹10)
+  const isFirstOrder = (!backendOrders || backendOrders.length === 0);
+  const calculatedDeliveryFee = distanceKm <= 2 ? 20 : Math.round(20 + (distanceKm - 2) * 10);
+  const deliveryFee = isFirstOrder ? 0 : (subtotal > 0 ? calculatedDeliveryFee : 0);
   
-  const totalAmount = Math.max(0, ((subtotal + deliveryFee) + riderTip) - discount);
+  // 💰 టోటల్ అమౌంట్ మరియు వాలెట్ డిడక్షన్ కాలిక్యులేషన్
+  const safeTip = Number(riderTip || 0);
+  const safeDiscount = Number(discount || 0);
+  const rawTotalAmount = Math.max(0, ((subtotal + deliveryFee) + safeTip) - safeDiscount);
+
+  const walletDeduction = useWalletBalance ? Math.min(Number(walletBalance || 0), rawTotalAmount) : 0;
+  const totalAmount = Math.max(0, rawTotalAmount - walletDeduction);
+
   const splitAmount = (totalAmount / Math.max(1, splitPeople)).toFixed(2);
+
+//const splitAmount = (totalAmount / Math.max(1, splitPeople)).toFixed(2);
 
  const applyPromo = async () => {
     if (!promoCode.trim()) {
@@ -1604,7 +1689,7 @@ export default function CustomerApp() {
             <div className="w-full max-w-[370px] bg-slate-900/85 backdrop-blur-2xl rounded-[40px] p-8 shadow-2xl border border-white/10 space-y-6 relative z-10">
               <div className="text-center space-y-3">
                 <div className="w-20 h-20 mx-auto rounded-3xl p-1 bg-gradient-to-tr from-[#fc8019] to-amber-400 shadow-xl shadow-orange-500/30 flex items-center justify-center transform hover:scale-105 transition-transform duration-300">
-                  <div className="w-full h-full bg-slate-950 rounded-[22px] overflow-hidden flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-2xl overflow-hidden flex items-center justify-center bg-slate-950 shrink-0 shadow-sm">
                     <img src={logo} alt="Foodiee Logo" className="w-full h-full object-cover" />
                   </div>
                 </div>
@@ -1807,8 +1892,8 @@ export default function CustomerApp() {
                         district: '',
                         state: '',
                         pincode: '',
-                        latitude: 18.5793,
-                        longitude: 84.4452
+                        latitude: '',
+                        longitude: ''
                       });
 
                       toast.success('✓ Registration successful! Please login.');
@@ -2000,32 +2085,83 @@ export default function CustomerApp() {
             darkMode ? 'bg-slate-900 text-white' : 'bg-gradient-to-br from-slate-50 via-gray-100 to-orange-50/40 text-gray-900'
           }`}>
 
-            <header className={`${darkMode ? 'bg-slate-800/90 border-slate-700' : 'bg-white/90 border-b'} backdrop-blur-md border-b px-3 py-2.5 shrink-0 shadow-sm z-30 space-y-1.5`}>
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => { setActiveTab('home'); setSelectedCategory(null); setSelectedShop(null); setIsPaymentScreen(false); setActiveTrackingOrder(null); }}
-                  className="flex items-center gap-2 text-left cursor-pointer group"
-                >
-                  <div className="w-8 h-8 rounded-2xl overflow-hidden flex items-center justify-center bg-slate-950 shrink-0">
-                    <img src={logo} alt="Foodiee Logo" className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <h1 className="text-base font-black tracking-wider bg-gradient-to-r from-[#fc8019] via-amber-500 to-yellow-400 bg-clip-text text-transparent drop-shadow-sm">
-                      Foodiee
-                    </h1>
-                    <p className="text-[10px] font-extrabold text-slate-400 dark:text-slate-400 tracking-wide mt-[-2px]">
-                      Ichapuram
-                    </p>
-                  </div>
-                </button>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => setShowNotificationModal(true)} className="relative p-1.5 rounded-xl bg-orange-50 dark:bg-slate-700 text-[#fc8019]" title="Offers">
-                    <Bell size={16} />
-                    {notifications.some(n => n.unread) && (
-                      <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>
-                    )}
+          <header className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-200'} backdrop-blur-md border-b px-3.5 py-3 shrink-0 shadow-sm z-30 space-y-2.5 relative`}>
+              
+              {/* 1. Top Row: Logo, Foodiee Name & Address Dropdown Toggle */}
+              <div className="flex items-center justify-between gap-2">
+                
+                {/* 📍 Logo, Foodiee Name & Clickable Address Dropdown Button */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setIsAddressDropdownOpen(!isAddressDropdownOpen)} 
+                    className="flex items-center gap-2 text-left cursor-pointer group max-w-[220px]"
+                  >
+                    <div className="w-9 h-9 rounded-2xl overflow-hidden flex items-center justify-center bg-slate-950 shrink-0 shadow-sm">
+                      <img src={logo} alt="Foodiee Logo" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="min-w-0">
+                      {/* Foodiee Brand Name */}
+                      <h1 className="text-sm font-black tracking-wider bg-gradient-to-r from-[#fc8019] via-amber-500 to-yellow-400 bg-clip-text text-transparent drop-shadow-sm leading-tight">
+                        Foodiee
+                      </h1>
+                      
+                      {/* Address with Toggle Arrow */}
+                      <div className="flex items-center gap-1 mt-[-2px]">
+                        <p className="text-[10px] font-bold truncate text-gray-600 dark:text-gray-300">
+                          {address.street ? `${address.houseNo ? address.houseNo + ', ' : ''}${address.street}` : 'Select Address 📍'}
+                        </p>
+                        <span className={`text-[9px] text-gray-400 shrink-0 transition-transform duration-300 ${isAddressDropdownOpen ? 'rotate-180' : ''}`}>▼</span>
+                      </div>
+                    </div>
                   </button>
 
+                  {/* 🌟 Address Dropdown List (Blinkit / Zomato Style Popup) */}
+                  {isAddressDropdownOpen && (
+                    <div className={`absolute top-full left-0 mt-2 w-72 rounded-2xl shadow-2xl border p-3 z-50 backdrop-blur-xl ${darkMode ? 'bg-slate-900/95 border-slate-700 text-white' : 'bg-white/95 border-gray-200 text-slate-900'} animate-in fade-in slide-in-from-top-2 duration-200`}>
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-200 dark:border-slate-800">
+                        <span className="text-xs font-black text-[#fc8019]">Choose Delivery Address</span>
+                        <button 
+                          onClick={() => { setIsAddressDropdownOpen(false); setActiveTab('address'); }}
+                          className="text-[10px] font-bold text-amber-500 hover:underline"
+                        >
+                          + Add New
+                        </button>
+                      </div>
+
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {savedAddresses.length > 0 ? (
+                          savedAddresses.map((addr, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setAddress(addr);
+                                localStorage.setItem('foodiee_active_address', JSON.stringify(addr));
+                                setIsAddressDropdownOpen(false);
+                                toast.success('📍 Delivery address updated!');
+                              }}
+                              className={`w-full text-left p-2 rounded-xl text-xs transition flex items-start gap-2 ${address.street === addr.street ? 'bg-orange-500/10 border border-orange-500/30 font-bold text-[#fc8019]' : 'hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-300'}`}
+                            >
+                              <span className="text-sm">📍</span>
+                              <div className="truncate">
+                                <p className="font-black uppercase text-[10px] text-amber-500">{addr.type || 'HOME'}</p>
+                                <p className="truncate text-[11px]">{addr.houseNo ? addr.houseNo + ', ' : ''}{addr.street}</p>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="text-center py-3 text-xs text-gray-400">
+                            No saved addresses found. Click "+ Add New" to create one.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 💰 Wallet, Day/Night Toggle & Menu Icons (Right Side) */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  
+                  {/* Day / Night Mode Toggle */}
                   <button
                     onClick={() => setDarkMode(!darkMode)}
                     className={`px-2 py-1.5 rounded-xl text-[10px] font-black flex items-center gap-1 border shadow-sm transition ${darkMode ? 'bg-amber-500 text-slate-900 border-amber-400' : 'bg-slate-900 text-amber-400 border-slate-800'}`}
@@ -2034,27 +2170,39 @@ export default function CustomerApp() {
                     <span>{darkMode ? 'Day' : 'Night'}</span>
                   </button>
 
-                  <button onClick={() => setActiveTab('wallet')} className="bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-full text-[10px] font-black text-[#fc8019] flex items-center gap-1 shadow-sm">
-                    <Wallet size={11} /> ₹{walletBalance.toFixed(2)}
+                  {/* Wallet Badge */}
+                  <button 
+                    onClick={() => setActiveTab('wallet')} 
+                    className="bg-orange-50 dark:bg-slate-800 border border-orange-200 dark:border-slate-700 px-2.5 py-1.5 rounded-full text-[11px] font-black text-[#fc8019] flex items-center gap-1 shadow-sm cursor-pointer"
+                  >
+                    <Wallet size={12} />
+                    <span>₹{walletBalance.toFixed(0)}</span>
                   </button>
-                  <button onClick={() => setIsDrawerOpen(true)} className="p-1.5 rounded-xl bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-200">
+
+                  {/* Menu / Drawer Icon */}
+                  <button 
+                    onClick={() => setIsDrawerOpen(true)} 
+                    className="p-2 rounded-xl bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-gray-200 cursor-pointer"
+                  >
                     <Menu size={16} />
                   </button>
+
                 </div>
               </div>
 
+              {/* 2. Search Bar */}
               <div className="relative">
-                <div className={`flex items-center px-3 py-2 rounded-2xl gap-2 border ${darkMode ? 'bg-slate-700/80 border-slate-600 text-white' : 'bg-gray-100 border-gray-200 text-gray-800'} focus-within:border-[#fc8019]`}>
-                  <Search size={13} className="text-gray-400 shrink-0" />
+                <div className={`flex items-center px-3.5 py-2.5 rounded-2xl gap-2 border ${darkMode ? 'bg-slate-800/90 border-slate-700 text-white' : 'bg-gray-100 border-gray-200 text-gray-800'} focus-within:border-[#fc8019]`}>
+                  <Search size={15} className="text-gray-400 shrink-0" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search dishes, groceries or address..."
+                    placeholder="Search 'biryani', 'groceries'..."
                     className="bg-transparent text-xs w-full outline-none font-bold placeholder:text-gray-400"
                   />
                   <button onClick={() => toast.success('🎤 Voice search listening...')} className="text-gray-400 hover:text-[#fc8019]">
-                    <Mic size={14} />
+                    <Mic size={15} />
                   </button>
                 </div>
               </div>
@@ -2223,7 +2371,7 @@ export default function CustomerApp() {
                   className="w-44 h-44 mx-auto rounded-xl"
                 />
                 <div className="mt-2 space-y-0.5">
-                  <p className="text-xs font-black text-slate-950">UPI ID: nbommali52@ybl</p>
+                  <p className="text-xs font-black text-slate-950">Scan & pay</p>
                   <p className="text-sm font-black text-emerald-600">Pay ₹{addAmountInput}</p>
                 </div>
               </div>
@@ -2790,25 +2938,44 @@ export default function CustomerApp() {
 </div>
 
                     <div className="space-y-1 text-xs text-gray-400">
-                      <div className="flex justify-between">
-                        <span>Total</span>
-                        <span className="font-bold">₹{subtotal}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Delivery</span>
-                        <span className="font-bold">₹{deliveryFee}</span>
-                      </div>
-                     {discount > 0 && (
-                     <div className="flex justify-between items-center text-emerald-600 font-bold">
-                    <span>Discount {promoCode && `(${promoCode.toUpperCase()})`}</span>
-                    <span>-₹{discount}</span>
-                    </div>
-                      )}
-                      <div className="pt-2 border-t border-dashed flex justify-between items-center text-xs font-black">
-                        <span>To Pay</span>
-                        <span className="text-[#fc8019] text-sm">₹{totalAmount}</span>
-                      </div>
-                    </div>
+  <div className="flex justify-between">
+    <span>Total</span>
+    <span className="font-bold">₹{subtotal}</span>
+  </div>
+
+  {/* 👇 డెలివరీ ఫీజు మరియు దూరం (Distance) చూపించే కోడ్ */}
+  <div className="flex justify-between items-center">
+    <span className="flex items-center gap-1.5">
+      <span>Delivery Fee</span>
+      <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+        ({(() => {
+          const R = 6371; 
+          const dLat = (custLat - shopLat) * (Math.PI / 180);
+          const dLon = (custLng - shopLng) * (Math.PI / 180);
+          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(shopLat * (Math.PI / 180)) * Math.cos(custLat * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distanceKm = R * c;
+          return distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`;
+        })()})
+      </span>
+    </span>
+    <span className="font-bold">
+      {deliveryFee === 0 ? <span className="text-emerald-500 font-black">FREE (1st Order)</span> : `₹${deliveryFee}`}
+    </span>
+  </div>
+
+  {discount > 0 && (
+    <div className="flex justify-between items-center text-emerald-600 font-bold">
+      <span>Discount {promoCode && `(${promoCode.toUpperCase()})`}</span>
+      <span>-₹{discount}</span>
+    </div>
+  )}
+
+  <div className="pt-2 border-t border-dashed flex justify-between items-center text-xs font-black">
+    <span>To Pay</span>
+    <span className="text-[#fc8019] text-sm">₹{totalAmount}</span>
+  </div>
+</div>
                   </div>
 
                   <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} p-3 rounded-2xl border shadow-sm space-y-2 text-xs`}>
@@ -2851,33 +3018,72 @@ export default function CustomerApp() {
                     {[
                       { name: `foodiee Wallet`, icon: '💰' },
                       { name: 'Razorpay Online', icon: '⚡' },
-                      { name: 'COD', icon: '💵' }
+                      { name: 'COD', icon: '💵' },
+                      { name: 'PhonePe UPI', icon: '📱' },
+                      { name: 'Google Pay (GPay)', icon: '🌐' }
                     ].map((method, idx) => (
-                      <button key={idx} onClick={() => handlePayment(method.name)} className={`w-full border p-2.5 rounded-xl text-xs font-bold flex justify-between items-center ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'}`}>
+                      <button 
+                        key={idx} 
+                        onClick={() => {
+                          const upiId = "nbommali52@ybl";
+                          const merchantName = "FoodieeApp";
+                          const finalAmount = totalAmount.toFixed(2);
+
+                          if (method.name === 'PhonePe UPI') {
+                            // 🌟 ఫోన్ పే రియల్ యాప్ ఇంటెంట్ లింక్
+                            const phonePeUrl = `phonepe://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${finalAmount}&cu=INR`;
+                            window.location.href = phonePeUrl;
+                            
+                            // ఒకవేళ యాప్ ఓపెన్ కాకపోతే బ్యాక్‌ఎండ్ ఆర్డర్ ప్రాసెస్ జరగడానికి ఫాల్‌బ్యాక్
+                            setTimeout(() => {
+                              handlePayment('PhonePe UPI');
+                            }, 1500);
+                          } 
+                          else if (method.name === 'Google Pay (GPay)') {
+                            // 🌟 గూగుల్ పే రియల్ యాప్ ఇంటెంట్ లింక్ (UPI Intent Scheme)
+                            const gpayUrl = `tez://upi/pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${finalAmount}&cu=INR`;
+                            window.location.href = gpayUrl;
+                            
+                            setTimeout(() => {
+                              handlePayment('Google Pay');
+                            }, 1500);
+                          } 
+                          else {
+                            handlePayment(method.name);
+                          }
+                        }} 
+                        className={`w-full border p-2.5 rounded-xl text-xs font-bold flex justify-between items-center cursor-pointer transition ${darkMode ? 'bg-slate-700 border-slate-600 hover:bg-slate-600' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+                      >
                         <span>{method.icon} {method.name}</span>
-                        <ChevronRight size={13} />
+                        <div className="flex items-center gap-1.5">
+                          {(method.name === 'PhonePe UPI' || method.name === 'Google Pay (GPay)') && (
+                            <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-md font-black">
+                              ₹{totalAmount.toFixed(2)}
+                            </span>
+                          )}
+                          <ChevronRight size={13} />
+                        </div>
                       </button>
                     ))}
                   </div>
                     {/* 👇 సరిగ్గా ఇక్కడ ఆ QR కోడ్ కంటెయినర్‌ను పేస్ట్ చేయండి */}
-                 <div className={`${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900'} p-4 rounded-2xl border shadow-sm space-y-3 text-center`}>
-  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block">Scan & Pay via PhonePe / GPay (nbommali52@ybl)</span>
+                <div className={`${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900'} p-4 rounded-2xl border shadow-sm space-y-3 text-center`}>
+  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block">Scan & Pay via PhonePe / GPay </span>
   
   <div className="bg-white p-3 rounded-2xl inline-block shadow-lg mx-auto border-2 border-amber-500">
     <img 
-      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=nbommali52@ybl&pn=FoodieeApp&am=${totalAmount}&cu=INR`)}`} 
+      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`upi://pay?pa=nbommali52@ybl&pn=FoodieeApp&am=${totalAmount.toFixed(2)}&cu=INR`)}`} 
       alt="Payment QR Code" 
       className="w-36 h-36 mx-auto rounded-lg"
       onError={(e) => {
-        // ఒకవేళ పైన ఉన్న API ఫెయిల్ అయితే, ఆల్టర్నేటివ్ Google Chart API ద్వారా QR కోడ్ లోడ్ అవ్వడానికి
         e.target.onerror = null;
-        e.target.src = `https://chart.googleapis.com/chart?chs=180x180&cht=qr&chl=${encodeURIComponent(`upi://pay?pa=nbommali52@ybl&pn=FoodieeApp&am=${totalAmount}&cu=INR`)}`;
+        e.target.src = `https://chart.googleapis.com/chart?chs=180x180&cht=qr&chl=${encodeURIComponent(`upi://pay?pa=nbommali52@ybl&pn=FoodieeApp&am=${totalAmount.toFixed(2)}&cu=INR`)}`;
       }}
     />
     <div className="mt-2 space-y-1 bg-amber-50 p-2 rounded-xl border border-amber-200">
       <p className="text-[10px] font-black text-slate-900">UPI ID: nbommali52@ybl</p>
       <p className="text-sm font-black text-emerald-600 bg-emerald-50 py-1 px-2 rounded-lg border border-emerald-200">
-        Total Amount: ₹{totalAmount}
+        Total Amount: ₹{totalAmount.toFixed(2)}
       </p>
     </div>
   </div>
@@ -2904,12 +3110,23 @@ export default function CustomerApp() {
                     ))
                   )}
                 </div>
-              ) : activeTab === 'address' ? (
-                <div className="space-y-4 text-xs animate-fadeIn">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-black text-gray-400 uppercase tracking-wider text-[11px]">Your Saved Addresses</h3>
-                    <span className="text-[10px] text-amber-400 font-bold">Ichapuram Zone 📍</span>
-                  </div>
+             ) : activeTab === 'address' ? (
+    <div className="space-y-4 text-xs animate-fadeIn">
+      
+      {/* 👇 ఇక్కడ కొత్తగా బ్యాక్ బటన్ యాడ్ చేయండి */}
+      <div className="flex items-center gap-2 mb-1">
+        <button 
+          onClick={() => setActiveTab('home')} 
+          className="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 shadow cursor-pointer transition border border-slate-700"
+        >
+          <span>←</span> Back to Dashboard
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <h3 className="font-black text-gray-400 uppercase tracking-wider text-[11px]">Your Saved Addresses</h3>
+  
+      </div>
 
                   <div className="space-y-2.5">
                     {savedAddresses.length === 0 ? (
@@ -2997,11 +3214,22 @@ export default function CustomerApp() {
                   </div>
                 </div>
               ) : activeTab === 'offers' ? (
-                <div className="space-y-4 text-xs animate-fadeIn pb-12">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-black text-gray-400 uppercase tracking-wider text-[11px]">* Offers & Rewards Hub</h3>
-                    <span className="text-[10px] text-amber-400 font-bold">Scratch & Earn</span>
-                  </div>
+    <div className="space-y-4 text-xs animate-fadeIn pb-12">
+      
+      {/* 👇 ఇక్కడ కొత్తగా బ్యాక్ బటన్ యాడ్ చేయండి */}
+      <div className="flex items-center gap-2 mb-1">
+        <button 
+          onClick={() => setActiveTab('home')} 
+          className="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 shadow cursor-pointer transition border border-slate-700"
+        >
+          <span>←</span> Back to Dashboard
+        </button>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <h3 className="font-black text-gray-400 uppercase tracking-wider text-[11px]">Offers & Rewards Hub</h3>
+        <span className="text-[10px] text-amber-400 font-bold">Scratch & Earn</span>
+      </div>
 
                   <div className="space-y-3">
                     {scratchCards.length === 0 ? (
@@ -3168,9 +3396,7 @@ export default function CustomerApp() {
                     <button onClick={() => setSelectedCategory(null)} className="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1.5 transition cursor-pointer">
                       <ArrowLeft size={14} /> Back to Categories
                     </button>
-                    <span className="text-[10px] bg-[#fc8019]/20 text-[#fc8019] border border-[#fc8019]/30 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
-                      Ichapuram Zone 📍
-                    </span>
+                  
                   </div>
 
                   <div className="space-y-1 px-1">
@@ -3415,12 +3641,23 @@ export default function CustomerApp() {
                   )}
                 </div>
               ) : activeTab === 'wallet' ? (
-                <div className="space-y-4 text-xs">
-                  <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-4 rounded-3xl text-white shadow-xl shadow-orange-500/20 space-y-2">
-                    <p className="text-[9px] uppercase font-bold opacity-90 tracking-wider">Wallet Balance (Real-Time)</p>
-                    <h2 className="text-2xl font-black">₹{walletBalance.toFixed(2)}</h2>
-                    <button onClick={() => setIsAddMoneyModalOpen(true)} className="w-full bg-slate-900 hover:bg-slate-950 text-white py-3 rounded-2xl font-black text-xs shadow-md mt-2 flex items-center justify-center gap-1.5 cursor-pointer transition"><Plus size={15} /> Add Money 💳</button>
-                  </div>
+    <div className="space-y-4 text-xs animate-fadeIn">
+      
+      {/* 👇 ఇక్కడ కొత్తగా బ్యాక్ బటన్ యాడ్ చేయండి */}
+      <div className="flex items-center gap-2 mb-1">
+        <button 
+          onClick={() => setActiveTab('home')} 
+          className="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 shadow cursor-pointer transition border border-slate-700"
+        >
+          <span>←</span> Back to Dashboard
+        </button>
+      </div>
+
+      <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-4 rounded-3xl text-white shadow-xl shadow-orange-500/20 space-y-2">
+        <p className="text-[9px] uppercase font-bold opacity-90 tracking-wider">Wallet Balance (Real-Time)</p>
+        <h2 className="text-2xl font-black">₹{walletBalance.toFixed(2)}</h2>
+        <button onClick={() => setIsAddMoneyModalOpen(true)} className="w-full bg-slate-900 hover:bg-slate-950 text-white py-3 rounded-2xl font-black text-xs shadow-md mt-2 flex items-center justify-center gap-1.5 cursor-pointer transition"><Plus size={15} /> Add Money 💳</button>
+      </div>
 
                   <div className="pt-1">
                     <button onClick={() => setIsWalletHistoryOpen(true)} className="w-full bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-amber-500/40 p-4 rounded-3xl shadow-xl flex justify-between items-center cursor-pointer group hover:border-amber-500 transition-all duration-300">
@@ -3437,12 +3674,23 @@ export default function CustomerApp() {
                     </button>
                   </div>
                 </div>
-              ) : activeTab === 'history' ? (
-                <div className="space-y-3 text-xs">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-black text-gray-400 uppercase">My Orders & Live Status (Latest on Top)</h3>
-                    <button onClick={() => { const userMob = phone || localStorage.getItem('userMobile'); if (userMob) { fetch(`${API_BASE_URL}/api/orders/customer/${userMob}`).then(res => res.json()).then(data => setBackendOrders(data)); toast.success('Refreshed!'); } }} className="text-[10px] bg-slate-800 text-amber-400 px-2.5 py-1 rounded-lg border border-slate-700">Refresh 🔄</button>
-                  </div>
+             ) : activeTab === 'history' ? (
+    <div className="space-y-3 text-xs animate-fadeIn">
+      
+      {/* 👇 ఇక్కడ కొత్తగా బ్యాక్ బటన్ యాడ్ చేయండి */}
+      <div className="flex items-center gap-2 mb-2">
+        <button 
+          onClick={() => setActiveTab('home')} 
+          className="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 shadow cursor-pointer transition border border-slate-700"
+        >
+          <span>←</span> Back to Dashboard
+        </button>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <h3 className="font-black text-gray-400 uppercase">My Orders & Live Status (Latest on Top)</h3>
+        <button onClick={() => { const userMob = phone || localStorage.getItem('userMobile'); if (userMob) { fetch(`${API_BASE_URL}/api/orders/customer/${userMob}`).then(res => res.json()).then(data => setBackendOrders(data)); toast.success('Refreshed!'); } }} className="text-[10px] bg-slate-800 text-amber-400 px-2.5 py-1 rounded-lg border border-slate-700">Refresh 🔄</button>
+      </div>
 
                   {backendOrders.length === 0 ? (
                     <div className="text-center py-16 text-xs text-gray-400">📦 No active or past orders found.</div>
@@ -3501,27 +3749,38 @@ export default function CustomerApp() {
                   )}
                 </div>
               ) : activeTab === 'profile' ? (
-                <div className="space-y-4 text-xs animate-fadeIn pb-12">
-                  <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-slate-700/80 p-5 rounded-[32px] shadow-xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-28 h-28 bg-[#fc8019]/10 rounded-full blur-2xl"></div>
-                    
-                    <div className="flex items-center gap-4 relative z-10">
-                      <img src={userPhoto} alt="Profile" className="w-16 h-16 rounded-2xl border-2 border-[#fc8019] object-cover shadow-lg shrink-0" />
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <h3 className="font-black text-base text-white truncate">{address.name || localStorage.getItem('userName') || 'Foodiee User'}</h3>
-                        <p className="text-slate-400 text-xs font-bold">+91 {address.mobile || phone || localStorage.getItem('userMobile')}</p>
-                        <button 
-                          onClick={() => {
-                            setEditProfileName(address.name || localStorage.getItem('userName') || '');
-                            setIsEditProfileModalOpen(true);
-                          }} 
-                          className="text-[10px] text-[#fc8019] font-black underline cursor-pointer hover:text-orange-400"
-                        >
-                          Edit Profile Details ✏️
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+    <div className="space-y-4 text-xs animate-fadeIn pb-12">
+      
+      {/* 👇 ఇక్కడ కొత్తగా బ్యాక్ బటన్ యాడ్ చేయండి */}
+      <div className="flex items-center gap-2 mb-1">
+        <button 
+          onClick={() => setActiveTab('home')} 
+          className="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 shadow cursor-pointer transition border border-slate-700"
+        >
+          <span>←</span> Back to Dashboard
+        </button>
+      </div>
+
+      <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-slate-700/80 p-5 rounded-[32px] shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-28 h-28 bg-[#fc8019]/10 rounded-full blur-2xl"></div>
+        
+        <div className="flex items-center gap-4 relative z-10">
+          <img src={userPhoto} alt="Profile" className="w-16 h-16 rounded-2xl border-2 border-[#fc8019] object-cover shadow-lg shrink-0" />
+          <div className="flex-1 min-w-0 space-y-1">
+            <h3 className="font-black text-base text-white truncate">{address.name || localStorage.getItem('userName') || 'Foodiee User'}</h3>
+            <p className="text-slate-400 text-xs font-bold">+91 {address.mobile || phone || localStorage.getItem('userMobile')}</p>
+            <button 
+              onClick={() => {
+                setEditProfileName(address.name || localStorage.getItem('userName') || '');
+                setIsEditProfileModalOpen(true);
+              }} 
+              className="text-[10px] text-[#fc8019] font-black underline cursor-pointer hover:text-orange-400"
+            >
+              Edit Profile Details ✏️
+            </button>
+          </div>
+        </div>
+      </div>
 
                   <div className="grid grid-cols-3 gap-2.5">
                     <div onClick={() => setActiveTab('history')} className="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl text-center space-y-1 cursor-pointer hover:border-[#fc8019] transition">
